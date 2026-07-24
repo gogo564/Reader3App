@@ -19,6 +19,9 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
 
+    - name: Generate Xcode project
+      run: python3 generate_project.py
+
     - name: Build Archive
       run: |
         xcodebuild archive \
@@ -26,19 +29,21 @@ jobs:
           -scheme ReaderApp \
           -archivePath build/ReaderApp.xcarchive \
           -configuration Release \
-          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_ALLOWED=NO \
+          -destination "generic/platform=iOS" \
+          CODE_SIGNING_REQUIRED=NO
 
-    - name: Export IPA
+    - name: Package IPA (unsigned)
       run: |
-        mkdir -p build/ipa
-        xcodebuild -exportArchive \
-          -archivePath build/ReaderApp.xcarchive \
-          -exportPath build/ipa \
-          -exportOptionsPlist ExportOptions.plist \
-          CODE_SIGNING_ALLOWED=NO
+        mkdir -p build/ipa/Payload
+        cp -r "build/ReaderApp.xcarchive/Products/Applications/ReaderApp.app" build/ipa/Payload/
+        cd build/ipa
+        zip -qr ReaderApp.ipa Payload/
+        rm -rf Payload
+        ls -la ReaderApp.ipa
 
     - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
         name: ReaderApp.ipa
-        path: build/ipa/*.ipa
+        path: build/ipa/ReaderApp.ipa
