@@ -5,6 +5,7 @@ enum APIError: LocalizedError {
     case networkError(Error)
     case serverError(Int)
     case decodeError
+    case apiError(String)
     case notLoggedIn
 
     var errorDescription: String? {
@@ -13,9 +14,16 @@ enum APIError: LocalizedError {
         case .networkError(let e): return "网络错误: \(e.localizedDescription)"
         case .serverError(let c): return "服务器错误: \(c)"
         case .decodeError: return "数据解析失败"
+        case .apiError(let m): return m
         case .notLoggedIn: return "未登录"
         }
     }
+}
+
+struct APIResponse<T: Codable>: Codable {
+    let isSuccess: Bool
+    let errorMsg: String?
+    let data: T?
 }
 
 class ReaderAPI {
@@ -39,11 +47,21 @@ class ReaderAPI {
 
     private let apiPrefix = "/reader3"
 
+    private func decode<T: Codable>(_ data: Data) throws -> T {
+        let response = try JSONDecoder().decode(APIResponse<T>.self, from: data)
+        guard response.isSuccess else {
+            throw APIError.apiError(response.errorMsg ?? "请求失败")
+        }
+        guard let result = response.data else {
+            throw APIError.decodeError
+        }
+        return result
+    }
+
     // MARK: - Bookshelf
     func getShelf() async throws -> [Book] {
         let data = try await get("\(apiPrefix)/getShelfBookWithCacheInfo")
-        let books = try JSONDecoder().decode([Book].self, from: data)
-        return books
+        return try decode(data) as [Book]
     }
 
     func saveBook(book: Book) async throws {
@@ -60,23 +78,13 @@ class ReaderAPI {
     // MARK: - Book Sources
     func getBookSources() async throws -> [BookSource] {
         let data = try await get("\(apiPrefix)/getBookSources")
-        let sources = try JSONDecoder().decode([BookSource].self, from: data)
-        return sources
+        return try decode(data) as [BookSource]
     }
 
     func searchBooks(keyword: String, page: Int = 1) async throws -> [SearchResult] {
-        guard let encoded = keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "\(baseURL)\(apiPrefix)/searchBookContent?keyword=\(encoded)&page=\(page)") else {
-            throw APIError.invalidURL
-        }
-        var req = URLRequest(url: url, timeoutInterval: 30)
-        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        guard let httpResp = resp as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) else {
-            throw APIError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0)
-        }
-        let results = try JSONDecoder().decode([SearchResult].self, from: data)
-        return results
+        let body = try JSONEncoder().encode(["keyword": keyword, "page": page])
+        let data = try await post("\(apiPrefix)/searchBook", body: body)
+        return try decode(data) as [SearchResult]
     }
 
     // MARK: - Book Content
@@ -92,7 +100,7 @@ class ReaderAPI {
         guard let httpResp = resp as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) else {
             throw APIError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0)
         }
-        let chapters = try JSONDecoder().decode([Chapter].self, from: data)
+        let chapters: [Chapter] = try decode(data)
         return chapters
     }
 
@@ -108,7 +116,11 @@ class ReaderAPI {
         guard let httpResp = resp as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) else {
             throw APIError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0)
         }
-        return String(data: data, encoding: .utf8) ?? "内容加载失败"
+        let response = try JSONDecoder().decode(APIResponse<String>.self, from: data)
+        guard response.isSuccess, let content = response.data else {
+            throw APIError.apiError(response.errorMsg ?? "加载失败")
+        }
+        return content
     }
 
     // MARK: - Internal
