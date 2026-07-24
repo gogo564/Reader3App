@@ -37,34 +37,36 @@ class ReaderAPI {
         return h
     }
 
+    private let apiPrefix = "/reader3"
+
     // MARK: - Bookshelf
     func getShelf() async throws -> [Book] {
-        let data = try await get("/getShelfBookWithCacheInfo")
+        let data = try await get("\(apiPrefix)/getShelfBookWithCacheInfo")
         let books = try JSONDecoder().decode([Book].self, from: data)
         return books
     }
 
     func saveBook(book: Book) async throws {
         let body = try JSONEncoder().encode(book)
-        _ = try await post("/saveBook", body: body)
+        _ = try await post("\(apiPrefix)/saveBook", body: body)
     }
 
     func deleteBook(bookURL: String) async throws {
         let payload = ["bookUrl": bookURL]
         let body = try JSONEncoder().encode(payload)
-        _ = try await post("/deleteBook", body: body)
+        _ = try await post("\(apiPrefix)/deleteBook", body: body)
     }
 
     // MARK: - Book Sources
     func getBookSources() async throws -> [BookSource] {
-        let data = try await get("/getBookSources")
+        let data = try await get("\(apiPrefix)/getBookSources")
         let sources = try JSONDecoder().decode([BookSource].self, from: data)
         return sources
     }
 
     func searchBooks(keyword: String, page: Int = 1) async throws -> [SearchResult] {
         guard let encoded = keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "\(baseURL)/searchBookContent?keyword=\(encoded)&page=\(page)") else {
+              let url = URL(string: "\(baseURL)\(apiPrefix)/searchBookContent?keyword=\(encoded)&page=\(page)") else {
             throw APIError.invalidURL
         }
         var req = URLRequest(url: url, timeoutInterval: 30)
@@ -81,7 +83,7 @@ class ReaderAPI {
     func getChapterList(bookURL: String, sourceURL: String) async throws -> [Chapter] {
         guard let encodedBook = bookURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let encodedSource = sourceURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "\(baseURL)/getBookContent?url=\(encodedBook)&bookSourceUrl=\(encodedSource)") else {
+              let url = URL(string: "\(baseURL)\(apiPrefix)/getBookContent?url=\(encodedBook)&bookSourceUrl=\(encodedSource)") else {
             throw APIError.invalidURL
         }
         var req = URLRequest(url: url, timeoutInterval: 30)
@@ -97,7 +99,7 @@ class ReaderAPI {
     func getChapterContent(bookURL: String, sourceURL: String, index: Int) async throws -> String {
         guard let encodedBook = bookURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let encodedSource = sourceURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "\(baseURL)/getBookContent?url=\(encodedBook)&bookSourceUrl=\(encodedSource)&index=\(index)") else {
+              let url = URL(string: "\(baseURL)\(apiPrefix)/getBookContent?url=\(encodedBook)&bookSourceUrl=\(encodedSource)&index=\(index)") else {
             throw APIError.invalidURL
         }
         var req = URLRequest(url: url, timeoutInterval: 30)

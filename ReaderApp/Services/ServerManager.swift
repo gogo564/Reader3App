@@ -32,7 +32,7 @@ class ServerManager: ObservableObject {
         guard let url = serverURL else { return }
         let trimmed = url.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
-        guard let requestURL = URL(string: "\(trimmed)/getBookSources") else {
+        guard let requestURL = URL(string: "\(trimmed)/reader3/getBookSources") else {
             connectionError = NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "无效的服务器地址"])
             return
         }
