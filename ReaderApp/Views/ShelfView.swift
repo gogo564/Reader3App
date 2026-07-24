@@ -28,7 +28,7 @@ struct ShelfView: View {
                             .font(.title2)
                             .foregroundColor(.secondary)
                         Text("去搜索添加书籍吧")
-                            .foregroundColor(Color.tertiary)
+                            .foregroundStyle(.tertiary)
                     }
                 } else {
                     ScrollView {

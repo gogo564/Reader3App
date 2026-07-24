@@ -107,7 +107,7 @@ struct SearchResultRow: View {
                 if let origin = result.origin {
                     Text(origin)
                         .font(.caption2)
-                        .foregroundColor(Color.tertiary)
+                        .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
                 if let intro = result.intro {
