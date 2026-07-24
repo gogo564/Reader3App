@@ -98,7 +98,7 @@ settings = {
     'CURRENT_PROJECT_VERSION': '1',
     'GENERATE_INFOPLIST_FILE': 'NO',
     'INFOPLIST_FILE': 'ReaderApp/Info.plist',
-    'IPHONEOS_DEPLOYMENT_TARGET': '16.0',
+    'IPHONEOS_DEPLOYMENT_TARGET': '15.0',
     'MARKETING_VERSION': '1.0.0',
     'PRODUCT_BUNDLE_IDENTIFIER': 'com.gogo564.reader',
     'PRODUCT_NAME': 'ReaderApp',
