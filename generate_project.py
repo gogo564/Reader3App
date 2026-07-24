@@ -64,7 +64,9 @@ lines = [
 # File references
 base = 'sourcecode.swift; fileEncoding = 4'
 for p, fid in file_refs.items():
-    lines.append(f'\t\t{fid} /* {os.path.basename(p)} */ = {{isa = PBXFileReference; explicitFileType = {base}; name = {os.path.basename(p)!r}; path = {p!r}; sourceTree = SOURCE_ROOT; }};')
+    escaped_name = os.path.basename(p).replace('"', '\\"')
+    escaped_path = p.replace('"', '\\"')
+    lines.append(f'\t\t{fid} /* {os.path.basename(p)} */ = {{isa = PBXFileReference; explicitFileType = {base}; name = "{escaped_name}"; path = "{escaped_path}"; sourceTree = SOURCE_ROOT; }};')
 
 lines.append(f'\t\t{infoid} /* Info.plist */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info.plist"; path = "ReaderApp/Info.plist"; sourceTree = SOURCE_ROOT; }};')
 lines.append(f'\t\t{assetsid} /* Assets.xcassets */ = {{isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = "Assets.xcassets"; path = "ReaderApp/Assets.xcassets"; sourceTree = SOURCE_ROOT; }};')
@@ -77,12 +79,12 @@ for p, bid in build_files.items():
 
 # Groups
 children_ids = list(file_refs.values()) + [infoid, assetsid]
-lines.append(f'\t\t{reader_group} = {{isa = PBXGroup; children = ( {" ".join(children_ids)} ); name = ReaderApp; path = ReaderApp; sourceTree = SOURCE_ROOT; }};')
+lines.append(f'\t\t{reader_group} = {{isa = PBXGroup; children = ( {", ".join(children_ids)} ); name = ReaderApp; path = ReaderApp; sourceTree = SOURCE_ROOT; }};')
 lines.append(f'\t\t{product_group} = {{isa = PBXGroup; children = ( {product_ref} ); name = Products; sourceTree = "<group>"; }};')
 lines.append(f'\t\t{root_group} = {{isa = PBXGroup; children = ( {reader_group}, {product_group} ); sourceTree = "<group>"; }};')
 
 # Build phases
-lines.append(f'\t\t{sources_phase} /* Sources */ = {{isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( {" ".join(build_files.values())} ); runOnlyForDeploymentPostprocessing = 0; }};')
+lines.append(f'\t\t{sources_phase} /* Sources */ = {{isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( {", ".join(build_files.values())} ); runOnlyForDeploymentPostprocessing = 0; }};')
 lines.append(f'\t\t{frameworks_phase} /* Frameworks */ = {{isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = ( ); runOnlyForDeploymentPostprocessing = 0; }};')
 lines.append(f'\t\t{resources_phase} /* Resources */ = {{isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ( ); runOnlyForDeploymentPostprocessing = 0; }};')
 
