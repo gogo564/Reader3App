@@ -7,7 +7,7 @@ struct ShelfView: View {
 
     var body: some View {
         NavigationView {
-            Group {
+            ZStack {
                 if isLoading {
                     ProgressView("加载书架...")
                 } else if let error = errorMsg {
@@ -28,7 +28,7 @@ struct ShelfView: View {
                             .font(.title2)
                             .foregroundColor(.secondary)
                         Text("去搜索添加书籍吧")
-                            .foregroundColor(.tertiary)
+                            .foregroundColor(Color.tertiary)
                     }
                 } else {
                     ScrollView {
