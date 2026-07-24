@@ -67,18 +67,20 @@ struct SetupView: View {
     private func testConnection() {
         guard !serverAddress.isEmpty else { return }
         isTesting = true
-        let addr = serverAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        var addr = serverAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !addr.hasPrefix("http://") && !addr.hasPrefix("https://") {
+            addr = "http://" + addr
+        }
         serverManager.serverURL = addr
         serverManager.username = useAuth ? username : ""
         serverManager.password = useAuth ? password : ""
         serverManager.testConnection()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak serverManager] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak serverManager] in
             guard let mgr = serverManager else { return }
             isTesting = false
-            if mgr.isConnected {
-            } else {
-                errorMsg = mgr.connectionError?.localizedDescription ?? "无法连接到服务器"
+            if !mgr.isConnected {
+                errorMsg = mgr.connectionError?.localizedDescription ?? "无法连接到服务器，请检查地址和网络"
                 showError = true
             }
         }
