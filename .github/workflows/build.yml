@@ -29,6 +29,12 @@ jobs:
           tail -5 DZMeBookRead.xcodeproj/project.pbxproj
           file DZMeBookRead.xcodeproj/project.pbxproj
 
+      - name: Try xcodebuild -list
+        run: |
+          xcodebuild -list -project DZMeBookRead.xcodeproj 2>&1 || true
+          echo "---"
+          xcodebuild -list -project DZMeBookRead.xcodeproj -showBuildSettings 2>&1 | head -30 || true
+
       - name: Build Archive
         run: |
           xcodebuild archive \
