@@ -14,6 +14,11 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
+      - name: Check Xcode
+        run: |
+          xcodebuild -version
+          xcodebuild -list -project DZMeBookRead.xcodeproj
+
       - name: Build Archive
         run: |
           xcodebuild archive \
