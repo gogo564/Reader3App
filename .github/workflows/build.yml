@@ -17,7 +17,17 @@ jobs:
       - name: Check Xcode
         run: |
           xcodebuild -version
-          xcodebuild -list -project DZMeBookRead.xcodeproj
+          plutil -lint DZMeBookRead.xcodeproj/project.pbxproj || true
+          head -20 DZMeBookRead.xcodeproj/project.pbxproj
+          ls -la DZMeBookRead.xcodeproj/
+          ls -la DZMeBookRead.xcodeproj/xcshareddata/xcschemes/ 2>/dev/null || echo "No schemes dir"
+
+      - name: Show pbxproj section headers
+        run: |
+          grep -n "Begin\|End\|objectVersion\|archiveVersion" DZMeBookRead.xcodeproj/project.pbxproj
+          echo "---File ends with:---"
+          tail -5 DZMeBookRead.xcodeproj/project.pbxproj
+          file DZMeBookRead.xcodeproj/project.pbxproj
 
       - name: Build Archive
         run: |
