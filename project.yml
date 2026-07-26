@@ -19,15 +19,7 @@ targets:
     type: application
     platform: iOS
     sources:
-      - Reader3App/AppDelegate.swift
-      - Reader3App/Extensions.swift
-      - Reader3App/Models.swift
-      - Reader3App/SearchViewController.swift
-      - Reader3App/SetupViewController.swift
-      - Reader3App/ShelfViewController.swift
-      - Reader3App/Services/AppState.swift
-      - Reader3App/Services/NetworkService.swift
-      - Reader3App/DZMeBookRead
+      - path: Reader3App
     settings:
       base:
         INFOPLIST_FILE: Reader3App/Info.plist
@@ -35,19 +27,3 @@ targets:
         CODE_SIGNING_ALLOWED: "NO"
         CODE_SIGN_IDENTITY: ""
         CODE_SIGNING_REQUIRED: "NO"
-    dependencies:
-      - target: ObjCThirdParty
-
-  ObjCThirdParty:
-    type: static-library
-    platform: iOS
-    sources:
-      - Reader3App/DZMeBookRead/other/thirdParty/ASValueTrackingSlider/ASValuePopUpView.m
-      - Reader3App/DZMeBookRead/other/thirdParty/ASValueTrackingSlider/ASValueTrackingSlider.m
-      - Reader3App/DZMeBookRead/other/thirdParty/DZMCoverController/DZMCoverController.m
-      - Reader3App/DZMeBookRead/other/thirdParty/DZMMagnifierView/DZMMagnifierView.m
-      - Reader3App/DZMeBookRead/other/thirdParty/DZMSegmentedControl/DZMSegmentedControl.m
-      - Reader3App/DZMeBookRead/other/thirdParty/FDFullscreenPopGesture/UINavigationController+FDFullscreenPopGesture.m
-    settings:
-      base:
-        PRODUCT_NAME: ObjCThirdParty
