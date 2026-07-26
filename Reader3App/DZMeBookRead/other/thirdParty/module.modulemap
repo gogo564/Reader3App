@@ -1,0 +1,9 @@
+module ObjCThirdParty {
+    header "ASValueTrackingSlider/ASValuePopUpView.h"
+    header "ASValueTrackingSlider/ASValueTrackingSlider.h"
+    header "DZMCoverController/DZMCoverController.h"
+    header "DZMMagnifierView/DZMMagnifierView.h"
+    header "DZMSegmentedControl/DZMSegmentedControl.h"
+    header "FDFullscreenPopGesture/UINavigationController+FDFullscreenPopGesture.h"
+    export *
+}

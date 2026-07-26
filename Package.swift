@@ -30,11 +30,18 @@ let package = Package(
             dependencies: ["ObjCThirdParty"],
             path: "Reader3App",
             exclude: [
-                "DZMeBookRead/other/thirdParty/ASValueTrackingSlider",
-                "DZMeBookRead/other/thirdParty/DZMCoverController",
-                "DZMeBookRead/other/thirdParty/DZMMagnifierView",
-                "DZMeBookRead/other/thirdParty/DZMSegmentedControl",
-                "DZMeBookRead/other/thirdParty/FDFullscreenPopGesture",
+                "DZMeBookRead/other/thirdParty",
+            ],
+            cSettings: [
+                .headerSearchPath("DZMeBookRead/other"),
+                .headerSearchPath("DZMeBookRead/other/thirdParty/ASValueTrackingSlider"),
+                .headerSearchPath("DZMeBookRead/other/thirdParty/DZMCoverController"),
+                .headerSearchPath("DZMeBookRead/other/thirdParty/DZMMagnifierView"),
+                .headerSearchPath("DZMeBookRead/other/thirdParty/DZMSegmentedControl"),
+                .headerSearchPath("DZMeBookRead/other/thirdParty/FDFullscreenPopGesture"),
+            ],
+            swiftSettings: [
+                .unsafeFlags(["-import-objc-header", "DZMeBookRead/other/DZMeBookRead-Bridging-Pch.h"])
             ]
         ),
     ]
