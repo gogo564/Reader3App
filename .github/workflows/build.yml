@@ -22,9 +22,7 @@ jobs:
           xcodebuild -project Reader3App.xcodeproj -scheme Reader3App -destination generic/platform=iOS \
             -archivePath /tmp/Reader3App.xcarchive \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
-            archive 2>&1 | tee /tmp/xcodebuild.log | tail -30
-          echo "=== FULL ERROR LOG ==="
-          grep -E "error:|error:|CompileAssetCatalog|actool|FAILED" /tmp/xcodebuild.log | head -20
+            archive 2>&1 | tail -30
 
       - name: Package IPA
         run: |
