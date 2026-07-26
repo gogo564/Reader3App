@@ -11,9 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build
+      - name: Convert pbxproj to modern plist
         run: |
-          export DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer
+          plutil -convert xml1 DZMeBookRead.xcodeproj/project.pbxproj -o /tmp/project-xml.pbxproj
+          plutil -lint /tmp/project-xml.pbxproj
+          cp /tmp/project-xml.pbxproj DZMeBookRead.xcodeproj/project.pbxproj
+
+      - name: Build Archive
+        run: |
           xcodebuild archive \
             -project DZMeBookRead.xcodeproj \
             -scheme Reader3App \
