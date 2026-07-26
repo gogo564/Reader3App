@@ -1,7 +1,7 @@
 import UIKit
 
 class DZMReadChapterListModel: NSObject {
-    var id: NSNumber!
-    var bookID: String!
-    var name: String!
+    @objc var id: NSNumber!
+    @objc var bookID: String!
+    @objc var name: String!
 }
