@@ -153,7 +153,7 @@ def gen_pbxproj():
     L("\tarchiveVersion = 1;")
     L("\tclasses = {")
     L("\t};")
-    L("\t	objectVersion = 57;")
+    L("\t	objectVersion = 56;")
     L("\tobjects = {")
 
     # === PBXBuildFile ===
