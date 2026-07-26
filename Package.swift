@@ -6,15 +6,35 @@ let package = Package(
     platforms: [.iOS(.v15)],
     targets: [
         .target(
-            name: "Reader3App",
-            path: "Reader3App",
+            name: "ObjCThirdParty",
+            path: "Reader3App/DZMeBookRead/other/thirdParty",
+            sources: [
+                "ASValueTrackingSlider/ASValuePopUpView.m",
+                "ASValueTrackingSlider/ASValueTrackingSlider.m",
+                "DZMCoverController/DZMCoverController.m",
+                "DZMMagnifierView/DZMMagnifierView.m",
+                "DZMSegmentedControl/DZMSegmentedControl.m",
+                "FDFullscreenPopGesture/UINavigationController+FDFullscreenPopGesture.m",
+            ],
             publicHeadersPath: ".",
             cSettings: [
-                .headerSearchPath("DZMeBookRead/other/thirdParty/ASValueTrackingSlider"),
-                .headerSearchPath("DZMeBookRead/other/thirdParty/DZMCoverController"),
-                .headerSearchPath("DZMeBookRead/other/thirdParty/DZMMagnifierView"),
-                .headerSearchPath("DZMeBookRead/other/thirdParty/DZMSegmentedControl"),
-                .headerSearchPath("DZMeBookRead/other/thirdParty/FDFullscreenPopGesture"),
+                .headerSearchPath("ASValueTrackingSlider"),
+                .headerSearchPath("DZMCoverController"),
+                .headerSearchPath("DZMMagnifierView"),
+                .headerSearchPath("DZMSegmentedControl"),
+                .headerSearchPath("FDFullscreenPopGesture"),
+            ]
+        ),
+        .target(
+            name: "Reader3App",
+            dependencies: ["ObjCThirdParty"],
+            path: "Reader3App",
+            exclude: [
+                "DZMeBookRead/other/thirdParty/ASValueTrackingSlider",
+                "DZMeBookRead/other/thirdParty/DZMCoverController",
+                "DZMeBookRead/other/thirdParty/DZMMagnifierView",
+                "DZMeBookRead/other/thirdParty/DZMSegmentedControl",
+                "DZMeBookRead/other/thirdParty/FDFullscreenPopGesture",
             ]
         ),
     ]
