@@ -38,7 +38,10 @@ class ShelfViewController: UIViewController {
     }
 
     private func setupNavigationBar() {
-        navigationItem.leftBarButtonItem = UIBarButtonItem(title: "搜索", style: .plain, target: self, action: #selector(showSearch))
+        navigationItem.leftBarButtonItems = [
+            UIBarButtonItem(title: "搜索", style: .plain, target: self, action: #selector(showSearch)),
+            UIBarButtonItem(title: "日志", style: .plain, target: self, action: #selector(showCrashLog)),
+        ]
         updateRightBarButton()
     }
 
@@ -64,6 +67,38 @@ class ShelfViewController: UIViewController {
             self?.addAndOpen(result)
         }
         present(UINavigationController(rootViewController: search), animated: true)
+    }
+
+    @objc private func showCrashLog() {
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("crash.log")
+        let text: String
+        if let u = url, let data = try? Data(contentsOf: u), let s = String(data: data, encoding: .utf8), !s.isEmpty {
+            text = s
+        } else {
+            text = "暂无崩溃日志"
+        }
+        let vc = UIViewController()
+        let tv = UITextView(frame: .zero)
+        tv.text = text
+        tv.isEditable = false
+        tv.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        vc.view.addSubview(tv)
+        tv.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            tv.topAnchor.constraint(equalTo: vc.view.topAnchor),
+            tv.leadingAnchor.constraint(equalTo: vc.view.leadingAnchor),
+            tv.trailingAnchor.constraint(equalTo: vc.view.trailingAnchor),
+            tv.bottomAnchor.constraint(equalTo: vc.view.bottomAnchor),
+        ])
+        vc.title = "崩溃日志"
+        vc.navigationItem.rightBarButtonItem = UIBarButtonItem(title: "关闭", style: .done, target: self, action: #selector(dismissLog))
+        let nav = UINavigationController(rootViewController: vc)
+        nav.modalPresentationStyle = .fullScreen
+        present(nav, animated: true)
+    }
+
+    @objc private func dismissLog() {
+        dismiss(animated: true)
     }
 
     private func addAndOpen(_ result: SearchResult) {
