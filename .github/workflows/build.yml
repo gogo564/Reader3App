@@ -7,46 +7,18 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ vars.RUNNER || 'macos-14' }}
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
-
-      - name: Check Xcode
+      - name: Build
         run: |
-          xcodebuild -version
-          plutil -lint DZMeBookRead.xcodeproj/project.pbxproj || true
-          echo "=== df ==="
-          df -h / /tmp 2>/dev/null || true
-
-      - name: Try xcodebuild from project dir
-        run: |
-          cd DZMeBookRead.xcodeproj
-          xcodebuild -list 2>&1 | head -5 || true
-          cd ..
-
-      - name: Build Archive
-        run: |
-          xcodebuild archive \
+          TMPDIR=/tmp \
+          xcodebuild build \
             -project DZMeBookRead.xcodeproj \
             -scheme Reader3App \
             -configuration Release \
-            -archivePath /tmp/Reader3App.xcarchive \
+            -derivedDataPath /tmp/dd \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Export IPA
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath /tmp/Reader3App.xcarchive \
-            -exportPath /tmp/ipa \
-            -exportOptionsPlist exportOptions.plist
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Reader3App.ipa
-          path: /tmp/ipa/Reader3App.ipa
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
