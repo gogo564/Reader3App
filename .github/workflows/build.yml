@@ -7,37 +7,27 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Diagnostics
+      - name: Remove workspace and build
         run: |
-          echo "=== Arch ==="
-          arch
-          echo "=== Rosetta ==="
-          /usr/bin/pgrep oahd >/dev/null 2>&1 && echo "Rosetta running" || echo "No Rosetta"
-          echo "=== Sandbox ==="
-          sandbox-exec -p '(version 1)(allow default)' /usr/bin/true 2>&1 && echo "sandbox-exec works" || echo "no sandbox-exec"
-          echo "=== xcodebuild arch ==="
-          lipo -archs /Applications/Xcode_15.4.app/Contents/Developer/usr/bin/xcodebuild 2>/dev/null
-          echo "=== TMPDIR ==="
-          echo "$TMPDIR"
-          ls -la /var/folders/ 2>/dev/null
-          echo "=== Write test ==="
-          touch /tmp/test_write && echo "can write to /tmp" || echo "cannot write to /tmp"
-          touch $HOME/test_write && echo "can write to HOME" || echo "cannot write to HOME"
-
-      - name: Try build with macos-13 clone trick
-        run: |
-          git clone --depth 1 https://github.com/gogo564/Reader3App.git /tmp/r2
-          cd /tmp/r2
-          sudo xcode-select -s /Applications/Xcode_15.4.app 2>/dev/null
+          rm -rf DZMeBookRead.xcodeproj/project.xcworkspace
           xcodebuild archive \
             -project DZMeBookRead.xcodeproj \
             -scheme Reader3App \
             -configuration Release \
-            -archivePath /tmp/r2.xcarchive \
+            -archivePath /tmp/Reader3App.xcarchive \
+            IDEPackageSupportUseBuiltinSCM=NO \
+            IDESuppressIndexing=YES \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
+
+      - name: Upload IPA
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Reader3App.ipa
+          path: /tmp/ipa/Reader3App.ipa
