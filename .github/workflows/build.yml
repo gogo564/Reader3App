@@ -43,7 +43,8 @@ jobs:
               echo "--- Xcode $ver ---"
               sudo xcode-select -s "$path" 2>/dev/null
               xcodebuild -version 2>&1 | head -1
-              xcodebuild -list -project DZMeBookRead.xcodeproj 2>&1 | head -2 || true
+              result=$(xcodebuild -list -project DZMeBookRead.xcodeproj 2>&1) || true
+              echo "$result" | grep -E "error:|Reason:|Information about project" || echo "(no project info)"
             fi
           done
           echo "=== Restore Xcode 15.4 ==="
