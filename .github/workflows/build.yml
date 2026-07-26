@@ -35,49 +35,54 @@ jobs:
           xattr -l DZMeBookRead.xcodeproj/project.pbxproj 2>&1 || echo "no xattr"
           ls -la@ DZMeBookRead.xcodeproj/ 2>&1 || ls -la DZMeBookRead.xcodeproj/
           echo "=== Test minimal project ==="
-          mkdir -p /tmp/testproj && cd /tmp/testproj
-          echo "int main() { return 0; }" > main.c
-          cat > Minimal.xcodeproj/project.pbxproj << 'PLIST'
-// !$*UTF8*$!
+          mkdir -p /tmp/testproj/Minimal.xcodeproj
+          echo "int main() { return 0; }" > /tmp/testproj/main.c
+          python3 -c "
+import textwrap
+pbx = textwrap.dedent('''\\
+// !\$*UTF8*\$!
 {
-	archiveVersion = 1;
-	classes = { };
-	objectVersion = 56;
-	objects = {
+\tarchiveVersion = 1;
+\tclasses = { };
+\tobjectVersion = 56;
+\tobjects = {
 /* Begin PBXBuildFile section */
-		A00000000000000000000001 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000002; };
+\t\tA00000000000000000000001 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000002; };
 /* End PBXBuildFile section */
 /* Begin PBXFileReference section */
-		A00000000000000000000002 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
-		A00000000000000000000003 /* Minimal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Minimal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+\t\tA00000000000000000000002 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = \"<group>\"; };
+\t\tA00000000000000000000003 /* Minimal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Minimal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 /* Begin PBXGroup section */
-		A00000000000000000000004 = {isa = PBXGroup; children = (A00000000000000000000005 /* Products */, A00000000000000000000002 /* main.c */,); sourceTree = "<group>"; };
-		A00000000000000000000005 /* Products */ = {isa = PBXGroup; children = (A00000000000000000000003 /* Minimal.app */,); name = Products; sourceTree = "<group>"; };
+\t\tA00000000000000000000004 = {isa = PBXGroup; children = (A00000000000000000000005 /* Products */, A00000000000000000000002 /* main.c */,); sourceTree = \"<group>\"; };
+\t\tA00000000000000000000005 /* Products */ = {isa = PBXGroup; children = (A00000000000000000000003 /* Minimal.app */,); name = Products; sourceTree = \"<group>\"; };
 /* End PBXGroup section */
 /* Begin PBXNativeTarget section */
-		A00000000000000000000006 /* Minimal */ = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000007; buildPhases = (A00000000000000000000008 /* Sources */,); name = Minimal; productName = Minimal; productReference = A00000000000000000000003; productType = "com.apple.product-type.application"; };
+\t\tA00000000000000000000006 /* Minimal */ = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000007; buildPhases = (A00000000000000000000008 /* Sources */,); name = Minimal; productName = Minimal; productReference = A00000000000000000000003; productType = \"com.apple.product-type.application\"; };
 /* End PBXNativeTarget section */
 /* Begin PBXProject section */
-		A00000000000000000000009 /* Project object */ = {isa = PBXProject; buildConfigurationList = A0000000000000000000000A; compatibilityVersion = "Xcode 14.0"; mainGroup = A00000000000000000000004; productRefGroup = A00000000000000000000005; projectDirPath = ""; projectRoot = ""; targets = (A00000000000000000000006 /* Minimal */,); };
+\t\tA00000000000000000000009 /* Project object */ = {isa = PBXProject; buildConfigurationList = A0000000000000000000000A; compatibilityVersion = \"Xcode 14.0\"; mainGroup = A00000000000000000000004; productRefGroup = A00000000000000000000005; projectDirPath = \"\"; projectRoot = \"\"; targets = (A00000000000000000000006 /* Minimal */,); };
 /* End PBXProject section */
 /* Begin PBXSourcesBuildPhase section */
-		A00000000000000000000008 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001 /* main.c in Sources */,); runOnlyForDeploymentPostprocessing = 0; };
+\t\tA00000000000000000000008 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001 /* main.c in Sources */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 /* Begin XCBuildConfiguration section */
-		A0000000000000000000000B /* Debug */ = {isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = Minimal; }; name = Debug; };
-		A0000000000000000000000C /* Release */ = {isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = Minimal; }; name = Release; };
+\t\tA0000000000000000000000B /* Debug */ = {isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = Minimal; }; name = Debug; };
+\t\tA0000000000000000000000C /* Release */ = {isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = Minimal; }; name = Release; };
 /* End XCBuildConfiguration section */
 /* Begin XCBuildConfigurationList section */
-		A0000000000000000000000A /* Project config list */ = {isa = XCBuildConfigurationList; buildConfigurations = (A0000000000000000000000B /* Debug */, A0000000000000000000000C /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		A00000000000000000000007 /* Target config list */ = {isa = XCBuildConfigurationList; buildConfigurations = (A0000000000000000000000B /* Debug */, A0000000000000000000000C /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+\t\tA0000000000000000000000A /* Project config list */ = {isa = XCBuildConfigurationList; buildConfigurations = (A0000000000000000000000B /* Debug */, A0000000000000000000000C /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+\t\tA00000000000000000000007 /* Target config list */ = {isa = XCBuildConfigurationList; buildConfigurations = (A0000000000000000000000B /* Debug */, A0000000000000000000000C /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCBuildConfigurationList section */
-	};
+\t};
 }
-PLIST
-          plutil -lint Minimal.xcodeproj/project.pbxproj
-          xcodebuild -list -project Minimal.xcodeproj 2>&1
-          xcodebuild -project Minimal.xcodeproj -scheme Minimal 2>&1 | tail -5 || true
+''')
+with open('/tmp/testproj/Minimal.xcodeproj/project.pbxproj', 'w') as f:
+    f.write(pbx)
+"
+          plutil -lint /tmp/testproj/Minimal.xcodeproj/project.pbxproj
+          xcodebuild -list -project /tmp/testproj/Minimal.xcodeproj 2>&1 || true
+          xcodebuild -project /tmp/testproj/Minimal.xcodeproj -scheme Minimal build 2>&1 | tail -10 || true
 
       - name: Build Archive
         run: |
