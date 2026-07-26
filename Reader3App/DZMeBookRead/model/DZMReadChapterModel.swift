@@ -42,10 +42,10 @@ class DZMReadChapterModel: NSObject {
     func contentAttributedString(page: NSInteger) -> NSAttributedString { pageModels[page].showContent }
     func locationFirst(page: NSInteger) -> NSNumber { NSNumber(value: pageModels[page].range.location) }
     func locationLast(page: NSInteger) -> NSNumber {
-        let r = pageModels[page].range; return NSNumber(value: r.location + r.length)
+        let r = pageModels[page].range!; return NSNumber(value: r.location + r.length)
     }
     func locationCenter(page: NSInteger) -> NSNumber {
-        let r = pageModels[page].range; return NSNumber(value: (r.location + (r.location + r.length) / 2))
+        let r = pageModels[page].range!; return NSNumber(value: (r.location + (r.location + r.length) / 2))
     }
     func page(location: NSInteger) -> NSNumber {
         for (i, m) in pageModels.enumerated() {

@@ -35,7 +35,7 @@ class DZMReadModel: NSObject {
         mark.location = recordModel.locationFirst
         mark.content = recordModel.contentString
         mark.name = recordModel.chapterName
-        mark.time = DZMReadParser.GetCurrentTimestamp()
+        mark.time = NSNumber(value: Timer1970())
         marksModels.insert(mark, at: 0)
     }
 

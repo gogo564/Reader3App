@@ -257,6 +257,9 @@ let DZM_READ_BOOK_HOME_PAGE:NSInteger = -1
 /// 用于指定章节最后一页
 let DZM_READ_LAST_PAGE:NSInteger = -1
 
+/// 当前章节位置（全局弱引用）
+var DZM_READ_RECORD_CURRENT_CHAPTER_LOCATION: NSNumber!
+
 /// 动画时间
 let DZM_READ_AD_TIME:TimeInterval = 0.2
 

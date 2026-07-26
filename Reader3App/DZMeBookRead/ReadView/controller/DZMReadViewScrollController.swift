@@ -151,7 +151,7 @@ class DZMReadViewScrollController: DZMViewController, UITableViewDelegate, UITab
         guard let cm = chapterModel, let chapterID = cm.previousChapterID, !cm.isFirstChapter,
               !loadChapterIDs.contains(chapterID), !chapterIDs.contains(chapterID) else { return }
         loadChapterIDs.append(chapterID)
-        let bookID = cm.bookID
+        let bookID = cm.bookID!
         let index = chapterID.intValue
         preloadChapter(bookID: bookID, chapterID: chapterID, index: index) { [weak self] temp in
             guard let self = self else { return }

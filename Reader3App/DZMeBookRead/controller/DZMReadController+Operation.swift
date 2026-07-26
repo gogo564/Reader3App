@@ -113,7 +113,7 @@ extension DZMReadController {
     func GetAboveReadRecordModel(recordModel: DZMReadRecordModel!) -> DZMReadRecordModel? {
         guard recordModel.chapterModel != nil else { return nil }
         let record = recordModel.copyModel()
-        let bookID = record.bookID
+        let bookID = record.bookID!
         let chapterID = record.chapterModel.previousChapterID
 
         if record.isFirstChapter && record.isFirstPage {
@@ -127,7 +127,7 @@ extension DZMReadController {
             if isExist {
                 record.modify(chapterID: chapterID, toPage: DZM_READ_LAST_PAGE, isSave: false)
             } else {
-                loadAndShowChapter(bookID: bookID, chapterID: chapterID, recordModel: record, toPage: DZM_READ_LAST_PAGE, isLocation: false)
+                loadAndShowChapter(bookID: bookID, chapterID: chapterID!, recordModel: record, toPage: DZM_READ_LAST_PAGE, isLocation: false)
                 return nil
             }
         } else {
@@ -139,7 +139,7 @@ extension DZMReadController {
     func GetBelowReadRecordModel(recordModel: DZMReadRecordModel!) -> DZMReadRecordModel? {
         guard recordModel.chapterModel != nil else { return nil }
         let record = recordModel.copyModel()
-        let bookID = record.bookID
+        let bookID = record.bookID!
         let chapterID = record.chapterModel.nextChapterID
 
         if record.isLastChapter && record.isLastPage {
@@ -153,7 +153,7 @@ extension DZMReadController {
             if isExist {
                 record.modify(chapterID: chapterID, toPage: 0, isSave: false)
             } else {
-                loadAndShowChapter(bookID: bookID, chapterID: chapterID, recordModel: record, toPage: 0, isLocation: false)
+                loadAndShowChapter(bookID: bookID, chapterID: chapterID!, recordModel: record, toPage: 0, isLocation: false)
                 return nil
             }
         } else {

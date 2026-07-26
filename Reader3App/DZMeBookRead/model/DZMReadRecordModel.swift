@@ -10,6 +10,7 @@ class DZMReadRecordModel: NSObject {
     var isFirstChapter: Bool! { chapterModel.isFirstChapter }
     var locationFirst: NSNumber! { chapterModel.locationFirst(page: page.intValue) }
     var locationLast: NSNumber! { chapterModel.locationLast(page: page.intValue) }
+    var pageModel: DZMReadPageModel! { chapterModel.pageModels[page.intValue] }
     var contentString: String! { chapterModel.contentString(page: page.intValue) }
     var contentAttributedString: NSAttributedString! { chapterModel.contentAttributedString(page: page.intValue) }
     var chapterName: String! { chapterModel.name }
