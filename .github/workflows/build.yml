@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: ${{ vars.RUNNER || 'macos-14' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -18,6 +18,14 @@ jobs:
         run: |
           xcodebuild -version
           plutil -lint DZMeBookRead.xcodeproj/project.pbxproj || true
+          echo "=== df ==="
+          df -h / /tmp 2>/dev/null || true
+
+      - name: Try xcodebuild from project dir
+        run: |
+          cd DZMeBookRead.xcodeproj
+          xcodebuild -list 2>&1 | head -5 || true
+          cd ..
 
       - name: Build Archive
         run: |
