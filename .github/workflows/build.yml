@@ -11,13 +11,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Try absolute path and sudo
+      - name: Build Archive
         run: |
-          echo "=== Try absolute path ==="
-          /Applications/Xcode_16.4.app/Contents/Developer/usr/bin/xcodebuild list -project "$PWD/DZMeBookRead.xcodeproj" 2>&1 | head -5 || true
-          echo "=== Try with sudo ==="
-          sudo /Applications/Xcode_16.4.app/Contents/Developer/usr/bin/xcodebuild list -project "$PWD/DZMeBookRead.xcodeproj" 2>&1 | head -5 || true
-          echo "=== Try Package.swift approach ==="
-          cp -a Reader3App /tmp/iosapp
-          cd /tmp/iosapp
-          swift build 2>&1 | tail -5 || true
+          xcodebuild archive \
+            -project "$PWD/DZMeBookRead.xcodeproj" \
+            -scheme Reader3App \
+            -configuration Release \
+            -archivePath /tmp/ipa.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -30
+
+      - name: Export IPA
+        if: success()
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath /tmp/ipa.xcarchive \
+            -exportPath /tmp/ipa \
+            -exportOptionsPlist exportOptions.plist
+
+      - name: Upload IPA
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Reader3App.ipa
+          path: /tmp/ipa/Reader3App.ipa
