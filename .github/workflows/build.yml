@@ -11,48 +11,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build with SwiftPM
-        run: |
-          rm -rf DZMeBookRead.xcodeproj
-          SRC="$PWD/Reader3App"
-          xcodebuild -scheme Reader3App-Package -destination generic/platform=iOS \
-            SWIFT_OBJC_BRIDGING_HEADER="$SRC/DZMeBookRead/other/DZMeBookRead-Bridging-Pch.h" \
-            SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            build 2>&1 | tee /tmp/build.log | tail -5
-          echo "=== ERRORS ==="
-          grep -n "error:" /tmp/build.log | head -30
-
       - name: Archive (unsigned)
         run: |
+          rm -rf DZMeBookRead.xcodeproj
           SRC="$PWD/Reader3App"
           xcodebuild -scheme Reader3App-Package -destination generic/platform=iOS \
             -archivePath /tmp/Reader3App.xcarchive \
             SWIFT_OBJC_BRIDGING_HEADER="$SRC/DZMeBookRead/other/DZMeBookRead-Bridging-Pch.h" \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            archive 2>&1 | tail -30
+            PRODUCT_TYPE="com.apple.product-type.application" \
+            INFOPLIST_FILE="$SRC/Info.plist" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
+            archive 2>&1 | tail -20
+          echo "=== CHECK ==="
+          find /tmp/Reader3App.xcarchive -name "*.app" -type d 2>/dev/null | head -3
+          ls -la /tmp/Reader3App.xcarchive/Products/Applications/ 2>/dev/null
 
-      - name: Package IPA from .xcarchive
+      - name: Package IPA
         run: |
-          ls -la /tmp/Reader3App.xcarchive/Products/Applications/ 2>/dev/null || echo "no app in archive"
-          find /tmp/Reader3App.xcarchive -name "*.app" -type d 2>/dev/null || echo "no app found"
-          # try packaging
           APP=$(find /tmp/Reader3App.xcarchive -name "*.app" -type d 2>/dev/null | head -1)
-          if [ -n "$APP" ]; then
-            mkdir -p /tmp/ipa/Payload
-            cp -R "$APP" /tmp/ipa/Payload/
-            cd /tmp/ipa
-            zip -r Reader3App.ipa Payload/
-            ls -lh Reader3App.ipa
+          if [ -z "$APP" ]; then
+            echo "No .app found, trying DerivedData..."
+            APP=$(find ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d 2>/dev/null | head -1)
           fi
+          if [ -z "$APP" ]; then
+            echo "ERROR: no .app found"
+            exit 1
+          fi
+          echo "App: $APP"
+          mkdir -p /tmp/ipa/Payload
+          cp -R "$APP" /tmp/ipa/Payload/
+          cd /tmp/ipa
+          zip -r Reader3App.ipa Payload/
+          ls -lh Reader3App.ipa
 
       - name: Upload IPA
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Reader3App.ipa
