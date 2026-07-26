@@ -7,9 +7,14 @@ let package = Package(
     targets: [
         .target(
             name: "Reader3App",
-            path: ".",
-            sources: [
-                "Reader3App/DZMeBookRead/other/extension/String+Extension.swift",
+            path: "Reader3App",
+            publicHeadersPath: ".",
+            cSettings: [
+                .headerSearchPath("DZMeBookRead/other/thirdParty/ASValueTrackingSlider"),
+                .headerSearchPath("DZMeBookRead/other/thirdParty/DZMCoverController"),
+                .headerSearchPath("DZMeBookRead/other/thirdParty/DZMMagnifierView"),
+                .headerSearchPath("DZMeBookRead/other/thirdParty/DZMSegmentedControl"),
+                .headerSearchPath("DZMeBookRead/other/thirdParty/FDFullscreenPopGesture"),
             ]
         ),
     ]
