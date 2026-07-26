@@ -16,15 +16,15 @@ extension DZMReadModel {
         }
         markModel.time = NSNumber(value: Timer1970())
         markModel.location = recordModel.locationFirst
-        if marksModels.isEmpty {
-            marksModels.append(markModel)
+        if markModels.isEmpty {
+            markModels.append(markModel)
         } else {
-            marksModels.insert(markModel, at: 0)
+            markModels.insert(markModel, at: 0)
         }
     }
 
     func removeMark(index: NSInteger) -> Bool {
-        marksModels.remove(at: index)
+        markModels.remove(at: index)
         return true
     }
 
@@ -32,18 +32,18 @@ extension DZMReadModel {
         let recordModel = (recordModel ?? self.recordModel)!
         let markModel = isExistMark(recordModel: recordModel)
         if markModel != nil {
-            let index = marksModels.firstIndex(of: markModel!)!
+            let index = markModels.firstIndex(of: markModel!)!
             return removeMark(index: index)
         }
         return false
     }
 
     func isExistMark(recordModel: DZMReadRecordModel? = nil) -> DZMReadMarkModel? {
-        if marksModels.isEmpty { return nil }
+        if markModels.isEmpty { return nil }
         let recordModel = (recordModel ?? self.recordModel)!
         let locationFirst = recordModel.locationFirst!
         let locationLast = recordModel.locationLast!
-        for markModel in marksModels {
+        for markModel in markModels {
             if markModel.chapterID == recordModel.chapterModel.id {
                 if (markModel.location.intValue >= locationFirst.intValue) && (markModel.location.intValue < locationLast.intValue) {
                     return markModel

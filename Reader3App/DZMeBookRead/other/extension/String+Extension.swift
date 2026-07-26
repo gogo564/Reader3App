@@ -102,7 +102,7 @@ extension String {
         
         for i in 0 ..< digestLength { hash.appendFormat("%02x", result[i]) }
         
-        result.deinitialize()
+        result.deinitialize(count: digestLength)
         
         return String(format: hash as String)
     }
