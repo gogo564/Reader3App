@@ -19,7 +19,10 @@ let DZM_COLOR_238_224_202:UIColor = RGB(238, 224, 202)  // 阅读背景颜色支
 let DZM_COLOR_253_85_103:UIColor = RGB(253, 85, 103)    // 粉红色
 
 /// 阅读背景颜色支持 - 牛皮黄
-let DZM_COLOR_BG_0:UIColor = UIColor(patternImage: UIImage(named: "read_bg_0_icon")!)
+let DZM_COLOR_BG_0:UIColor = {
+    if let img = UIImage(named: "read_bg_0_icon") { return UIColor(patternImage: img) }
+    return UIColor(red: 0.93, green: 0.88, blue: 0.79, alpha: 1)
+}()
 
 /// 随机颜色
 var DZM_COLOR_ARC:UIColor { return RGB(CGFloat(arc4random() % 255), CGFloat(arc4random() % 255), CGFloat(arc4random() % 255)) }

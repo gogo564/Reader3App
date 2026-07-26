@@ -25,12 +25,12 @@ class DZMRMLightView: DZMRMBaseView {
         backgroundColor = UIColor.clear
         
         leftIcon = UIImageView()
-        leftIcon.image = UIImage(named: "light_0")!.withRenderingMode(.alwaysTemplate)
+        leftIcon.image = (UIImage(named: "light_0") ?? UIImage()).withRenderingMode(.alwaysTemplate)
         leftIcon.tintColor = DZM_READ_COLOR_MENU_COLOR
         addSubview(leftIcon)
         
         rightIcon = UIImageView()
-        rightIcon.image = UIImage(named: "light_1")!.withRenderingMode(.alwaysTemplate)
+        rightIcon.image = (UIImage(named: "light_1") ?? UIImage()).withRenderingMode(.alwaysTemplate)
         rightIcon.tintColor = DZM_READ_COLOR_MENU_COLOR
         addSubview(rightIcon)
         
@@ -40,7 +40,7 @@ class DZMRMLightView: DZMRMBaseView {
         slider.maximumValue = 1.0
         slider.value = Float(UIScreen.main.brightness)
         slider.addTarget(self, action: #selector(sliderChanged(_:)), for: .valueChanged)
-        slider.setThumbImage(UIImage(named:"slider")!.withRenderingMode(.alwaysTemplate), for: .normal)
+        slider.setThumbImage((UIImage(named:"slider") ?? UIImage()).withRenderingMode(.alwaysTemplate), for: .normal)
         // 设置当前进度颜色
         slider.minimumTrackTintColor = DZM_READ_COLOR_MAIN
         // 设置总进度颜色

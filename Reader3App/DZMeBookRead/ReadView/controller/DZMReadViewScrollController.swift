@@ -14,9 +14,14 @@ class DZMReadViewScrollController: DZMViewController, UITableViewDelegate, UITab
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        chapterIDs.append(vc.readModel.recordModel.chapterModel.id)
+        let cm = vc.readModel.recordModel.chapterModel
+        chapterIDs.append(cm.id)
+        chapterModels[cm.id.stringValue] = cm
         reloadProgress()
-        tableView.scrollToRow(at: IndexPath(row: vc.readModel.recordModel.page.intValue, section: 0), at: .top, animated: false)
+        let page = min(Int(truncating: vc.readModel.recordModel.page), cm.pageCount.intValue - 1)
+        if page >= 0 {
+            tableView.scrollToRow(at: IndexPath(row: page, section: 0), at: .top, animated: false)
+        }
     }
 
     override func addSubviews() {

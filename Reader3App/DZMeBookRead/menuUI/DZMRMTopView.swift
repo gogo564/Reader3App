@@ -27,7 +27,7 @@ class DZMRMTopView: DZMRMBaseView {
         
         // 返回
         back = UIButton(type:.custom)
-        back.setImage(UIImage(named:"back")!.withRenderingMode(.alwaysTemplate), for: .normal)
+        back.setImage((UIImage(named:"back") ?? UIImage()).withRenderingMode(.alwaysTemplate), for: .normal)
         back.addTarget(self, action: #selector(clickBack), for: .touchUpInside)
         back.tintColor = DZM_READ_COLOR_MENU_COLOR
         addSubview(back)
@@ -35,7 +35,7 @@ class DZMRMTopView: DZMRMBaseView {
         // 书签
         mark = UIButton(type:.custom)
         mark.contentMode = .center
-        mark.setImage(UIImage(named:"mark")!.withRenderingMode(.alwaysTemplate), for: .normal)
+        mark.setImage((UIImage(named:"mark") ?? UIImage()).withRenderingMode(.alwaysTemplate), for: .normal)
         mark.addTarget(self, action: #selector(clickMark(_:)), for: .touchUpInside)
         mark.tintColor = DZM_READ_COLOR_MENU_COLOR
         addSubview(mark)

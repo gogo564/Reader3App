@@ -36,7 +36,7 @@ class DZMRMSpacingView: DZMRMBaseView {
             item.layer.borderColor = DZM_READ_COLOR_MENU_COLOR.cgColor
             item.layer.borderWidth = DZM_SPACE_SA_1
             item.titleLabel?.font = DZM_FONT_SA_12
-            item.setImage(UIImage(named: spacingIcon)!.withRenderingMode(.alwaysTemplate), for: .normal)
+            item.setImage((UIImage(named: spacingIcon) ?? UIImage()).withRenderingMode(.alwaysTemplate), for: .normal)
             item.tintColor = DZM_READ_COLOR_MENU_COLOR
             item.addTarget(self, action: #selector(clickItem(_:)), for: .touchUpInside)
             addSubview(item)

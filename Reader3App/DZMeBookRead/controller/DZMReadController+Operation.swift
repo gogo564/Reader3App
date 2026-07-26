@@ -122,14 +122,10 @@ extension DZMReadController {
         }
 
         if record.isFirstPage {
-            let isExist = readModel.recordModel.chapterModel?.id == chapterID ||
-                readModel.recordModel.chapterModel?.previousChapterID == chapterID
-            if isExist {
-                record.modify(chapterID: chapterID, toPage: DZM_READ_LAST_PAGE, isSave: false)
-            } else {
-                loadAndShowChapter(bookID: bookID, chapterID: chapterID!, recordModel: record, toPage: DZM_READ_LAST_PAGE, isLocation: false)
-                return nil
+            if !recordModel.isFirstChapter, let cid = chapterID {
+                loadAndShowChapter(bookID: bookID, chapterID: cid, recordModel: record, toPage: DZM_READ_LAST_PAGE, isLocation: false)
             }
+            return nil
         } else {
             record.previousPage()
         }
@@ -148,14 +144,10 @@ extension DZMReadController {
         }
 
         if record.isLastPage {
-            let isExist = readModel.recordModel.chapterModel?.id == chapterID ||
-                readModel.recordModel.chapterModel?.nextChapterID == chapterID
-            if isExist {
-                record.modify(chapterID: chapterID, toPage: 0, isSave: false)
-            } else {
-                loadAndShowChapter(bookID: bookID, chapterID: chapterID!, recordModel: record, toPage: 0, isLocation: false)
-                return nil
+            if !record.isLastChapter, let cid = chapterID {
+                loadAndShowChapter(bookID: bookID, chapterID: cid, recordModel: record, toPage: 0, isLocation: false)
             }
+            return nil
         } else {
             record.nextPage()
         }

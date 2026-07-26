@@ -36,7 +36,7 @@ class DZMRMFuncView: DZMRMBaseView {
         
         // 日夜间
         dn = UIButton(type:.custom)
-        dn.setImage(UIImage(named:"bar_2")!.withRenderingMode(.alwaysTemplate), for: .normal)
+        dn.setImage((UIImage(named:"bar_2") ?? UIImage()).withRenderingMode(.alwaysTemplate), for: .normal)
         dn.addTarget(self, action: #selector(clickDN(_:)), for: .touchUpInside)
         dn.tintColor = DZM_READ_COLOR_MENU_COLOR
         dn.isSelected = DZMUserDefaults.bool(DZM_READ_KEY_MODE_DAY_NIGHT)
@@ -45,7 +45,7 @@ class DZMRMFuncView: DZMRMBaseView {
         
         // 设置
         setting = UIButton(type: .custom)
-        setting.setImage(UIImage(named:"bar_1")!.withRenderingMode(.alwaysTemplate), for: .normal)
+        setting.setImage((UIImage(named:"bar_1") ?? UIImage()).withRenderingMode(.alwaysTemplate), for: .normal)
         setting.addTarget(self, action: #selector(clickSetting), for: .touchUpInside)
         setting.tintColor = DZM_READ_COLOR_MENU_COLOR
         addSubview(setting)

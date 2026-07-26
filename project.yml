@@ -24,6 +24,7 @@ targets:
       base:
         INFOPLIST_FILE: Reader3App/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: reader3app.Reader3App
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGNING_ALLOWED: "NO"
         CODE_SIGN_IDENTITY: ""
         CODE_SIGNING_REQUIRED: "NO"

@@ -103,9 +103,10 @@ class DZMReadConfigure: NSObject {
     /// 背景颜色
     var bgColor:UIColor! {
         
-        if bgColorIndex.intValue == DZM_READ_BG_COLORS.index(of: DZM_COLOR_BG_0) { // 牛皮黄背景
+        if bgColorIndex.intValue == DZM_READ_BG_COLORS.firstIndex(of: DZM_COLOR_BG_0) { // 牛皮黄背景
             
-            return UIColor(patternImage: UIImage(named: "read_bg_0")!)
+            if let img = UIImage(named: "read_bg_0") { return UIColor(patternImage: img) }
+            return DZM_COLOR_BG_0
             
         }else{
             

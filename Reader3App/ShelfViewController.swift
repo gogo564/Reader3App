@@ -214,6 +214,7 @@ class BookCell: UICollectionViewCell {
     private let coverView = UIImageView()
     private let nameLabel = UILabel()
     private let authorLabel = UILabel()
+    private let progressLabel = UILabel()
     private let deleteButton = UIButton(type: .system)
     var onDelete: (() -> Void)?
 
@@ -232,7 +233,11 @@ class BookCell: UICollectionViewCell {
         authorLabel.textColor = .secondaryLabel
         authorLabel.textAlignment = .center
         authorLabel.numberOfLines = 1
-        [coverView, nameLabel, authorLabel, deleteButton].forEach {
+        progressLabel.font = .systemFont(ofSize: 9)
+        progressLabel.textColor = UIColor(red: 0.58, green: 0.58, blue: 0.58, alpha: 1)
+        progressLabel.textAlignment = .center
+        progressLabel.numberOfLines = 2
+        [coverView, nameLabel, authorLabel, progressLabel, deleteButton].forEach {
             contentView.addSubview($0)
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
@@ -247,6 +252,9 @@ class BookCell: UICollectionViewCell {
             authorLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
             authorLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
             authorLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
+            progressLabel.topAnchor.constraint(equalTo: authorLabel.bottomAnchor, constant: 1),
+            progressLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
+            progressLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
         ])
         deleteButton.setTitle("✕", for: .normal)
         deleteButton.backgroundColor = UIColor(red: 1, green: 0.23, blue: 0.19, alpha: 1)
@@ -271,6 +279,11 @@ class BookCell: UICollectionViewCell {
         nameLabel.text = book.name
         authorLabel.text = book.author
         deleteButton.isHidden = !showDelete
+        if let t = book.durChapterTitle, let i = book.durChapterIndex {
+            progressLabel.text = "已读至\(i+1)章\n\(t)"
+        } else {
+            progressLabel.text = "未阅读"
+        }
         if let url = book.coverImageURL {
             URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
                 if let d = data { DispatchQueue.main.async { self?.coverView.image = UIImage(data: d) } }

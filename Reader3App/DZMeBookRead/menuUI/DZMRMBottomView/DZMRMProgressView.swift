@@ -47,7 +47,7 @@ class DZMRMProgressView: DZMRMBaseView,ASValueTrackingSliderDelegate,ASValueTrac
         slider = ASValueTrackingSlider()
         slider.delegate = self
         slider.dataSource = self
-        slider.setThumbImage(UIImage(named:"slider")!.withRenderingMode(.alwaysTemplate), for: .normal)
+        slider.setThumbImage((UIImage(named:"slider") ?? UIImage()).withRenderingMode(.alwaysTemplate), for: .normal)
         // 设置显示进度保留几位小数 (由于重写了 dataSource 则不用不到该属性了)
         // slider.setMaxFractionDigitsDisplayed(0)
         // 设置气泡背景颜色

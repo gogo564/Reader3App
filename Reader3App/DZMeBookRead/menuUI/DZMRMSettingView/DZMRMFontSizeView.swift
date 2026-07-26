@@ -56,7 +56,7 @@ class DZMRMFontSizeView: DZMRMBaseView {
         addSubview(fontSize)
         
         displayProgress = UIButton(type: .custom)
-        displayProgress.setBackgroundImage(UIImage(named: "page")!.withRenderingMode(.alwaysTemplate), for: .normal)
+        displayProgress.setBackgroundImage((UIImage(named: "page") ?? UIImage()).withRenderingMode(.alwaysTemplate), for: .normal)
         displayProgress.addTarget(self, action: #selector(clickDisplayProgress(button:)), for: .touchUpInside)
         displayProgress.isSelected = DZMReadConfigure.shared().progressIndex.boolValue
         addSubview(displayProgress)
