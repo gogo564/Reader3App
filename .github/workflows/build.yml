@@ -14,7 +14,11 @@ jobs:
       - name: Build with SwiftPM
         run: |
           rm -rf DZMeBookRead.xcodeproj
-          xcodebuild -scheme Reader3App-Package -destination generic/platform=iOS build 2>&1 | tee /tmp/build.log | tail -5
+          SRC="$PWD/Reader3App"
+          xcodebuild -scheme Reader3App-Package -destination generic/platform=iOS \
+            SWIFT_OBJC_BRIDGING_HEADER="$SRC/DZMeBookRead/other/DZMeBookRead-Bridging-Pch.h" \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG" \
+            build 2>&1 | tee /tmp/build.log | tail -5
           echo "=== ERRORS ==="
           grep -n "error:" /tmp/build.log | head -30
 

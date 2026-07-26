@@ -31,6 +31,7 @@ let package = Package(
             path: "Reader3App",
             exclude: [
                 "DZMeBookRead/other/thirdParty",
+                "Assets.xcassets", "Info.plist",
             ],
             cSettings: [
                 .headerSearchPath("DZMeBookRead/other"),
@@ -41,7 +42,6 @@ let package = Package(
                 .headerSearchPath("DZMeBookRead/other/thirdParty/FDFullscreenPopGesture"),
             ],
             swiftSettings: [
-                .unsafeFlags(["-import-objc-header", "DZMeBookRead/other/DZMeBookRead-Bridging-Pch.h"])
             ]
         ),
     ]
