@@ -96,22 +96,50 @@ class ShelfViewController: UIViewController {
         let readModel = DZMReadModel()
         readModel.bookID = book.bookUrl
         readModel.bookName = book.name
-        let recordModel = DZMReadRecordModel()
-        recordModel.bookID = book.bookUrl
-        let chapterModel = DZMReadChapterModel()
-        chapterModel.bookID = book.bookUrl
-        chapterModel.id = NSNumber(value: book.durChapterIndex ?? 0)
-        chapterModel.name = book.durChapterTitle ?? "开始阅读"
-        recordModel.chapterModel = chapterModel
-        readModel.recordModel = recordModel
-        readController.readModel = readModel
+
         readController.chapterList = { bookUrl in
             try await NetworkService.shared.getChapterList(bookUrl: bookUrl)
         }
         readController.chapterContent = { bookUrl, index in
             try await NetworkService.shared.getBookContent(bookUrl: bookUrl, index: index)
         }
-        navigationController?.pushViewController(readController, animated: true)
+
+        Task {
+            do {
+                let chapters = try await readController.chapterList!(book.bookUrl)
+                readController.catalogChapters = chapters
+                let index = book.durChapterIndex ?? 0
+                let rawContent = try await readController.chapterContent!(book.bookUrl, index)
+                let content = DZMReadParser.contentTypesetting(content: rawContent)
+
+                let recordModel = DZMReadRecordModel()
+                recordModel.bookID = book.bookUrl
+                let chapterModel = DZMReadChapterModel()
+                chapterModel.bookID = book.bookUrl
+                chapterModel.id = NSNumber(value: index)
+                chapterModel.name = book.durChapterTitle ?? chapters[safe: index]?.title ?? "开始阅读"
+                chapterModel.content = content
+                chapterModel.priority = NSNumber(value: index)
+                if index > 0 { chapterModel.previousChapterID = NSNumber(value: index - 1) }
+                else { chapterModel.previousChapterID = DZM_READ_NO_MORE_CHAPTER }
+                if index < chapters.count - 1 { chapterModel.nextChapterID = NSNumber(value: index + 1) }
+                else { chapterModel.nextChapterID = DZM_READ_NO_MORE_CHAPTER }
+                chapterModel.updateFont()
+                recordModel.chapterModel = chapterModel
+                readModel.recordModel = recordModel
+
+                await MainActor.run {
+                    readController.readModel = readModel
+                    navigationController?.pushViewController(readController, animated: true)
+                }
+            } catch {
+                await MainActor.run {
+                    let alert = UIAlertController(title: "加载失败", message: error.localizedDescription, preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "确定", style: .default))
+                    self.present(alert, animated: true)
+                }
+            }
+        }
     }
 }
 
