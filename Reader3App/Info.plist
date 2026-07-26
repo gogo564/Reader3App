@@ -14,8 +14,6 @@
     <string>Reader</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
-    <key>CFBundleIconName</key>
-    <string>AppIcon</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0.0</string>
     <key>CFBundleVersion</key>
