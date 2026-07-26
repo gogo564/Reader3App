@@ -11,28 +11,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate xcodeproj and archive (unsigned)
+      - name: Build with SwiftPM
         run: |
           rm -rf DZMeBookRead.xcodeproj
           SRC="$PWD/Reader3App"
-          BD="/tmp/build"
-          # generate xcodeproj
-          swift package generate-xcodeproj --output . 2>&1 || true
-          ls *.xcodeproj 2>/dev/null || echo "no xcodeproj generated"
-          # try archive with the generated xcodeproj
-          for xcproj in *.xcodeproj; do
-            if [ -d "$xcproj" ]; then
-              xcodebuild -project "$xcproj" -scheme Reader3App -destination generic/platform=iOS \
-                -archivePath "$BD/Reader3App.xcarchive" \
-                CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
-                archive 2>&1 | tail -20
-              break
-            fi
-          done
-          # check for .app
-          find "$BD" -name "*.app" -type d 2>/dev/null
-          echo "=== DerivedData ==="
-          find ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d 2>/dev/null
+          xcodebuild -scheme Reader3App-Package -destination generic/platform=iOS \
+            SWIFT_OBJC_BRIDGING_HEADER="$SRC/DZMeBookRead/other/DZMeBookRead-Bridging-Pch.h" \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            build 2>&1 | tee /tmp/build.log | tail -5
+          echo "=== ERRORS ==="
+          grep -n "error:" /tmp/build.log | head -30
+
+      - name: Archive (unsigned)
+        run: |
+          SRC="$PWD/Reader3App"
+          xcodebuild -scheme Reader3App-Package -destination generic/platform=iOS \
+            -archivePath /tmp/Reader3App.xcarchive \
+            SWIFT_OBJC_BRIDGING_HEADER="$SRC/DZMeBookRead/other/DZMeBookRead-Bridging-Pch.h" \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            archive 2>&1 | tail -30
+
+      - name: Package IPA from .xcarchive
+        run: |
+          ls -la /tmp/Reader3App.xcarchive/Products/Applications/ 2>/dev/null || echo "no app in archive"
+          find /tmp/Reader3App.xcarchive -name "*.app" -type d 2>/dev/null || echo "no app found"
+          # try packaging
+          APP=$(find /tmp/Reader3App.xcarchive -name "*.app" -type d 2>/dev/null | head -1)
+          if [ -n "$APP" ]; then
+            mkdir -p /tmp/ipa/Payload
+            cp -R "$APP" /tmp/ipa/Payload/
+            cd /tmp/ipa
+            zip -r Reader3App.ipa Payload/
+            ls -lh Reader3App.ipa
+          fi
 
       - name: Upload IPA
         if: success()
