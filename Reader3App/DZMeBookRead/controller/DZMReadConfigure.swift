@@ -117,7 +117,7 @@ class DZMReadConfigure: NSObject {
     var textColor:UIColor! {
         
         // 固定颜色
-        return DZM_COLOR_145_145_145
+        return RGB(58, 58, 58)
     
         // 根据背景颜色选择
 //        return DZM_READ_TEXT_COLORS[bgColorIndex.intValue]
@@ -137,7 +137,7 @@ class DZMReadConfigure: NSObject {
     var statusTextColor:UIColor! {
         
         // 固定颜色
-        return DZM_COLOR_145_145_145
+        return RGB(80, 80, 80)
         
         // 根据背景颜色选择
 //        return DZM_READ_STATUS_TEXT_COLORS[bgColorIndex.intValue]
