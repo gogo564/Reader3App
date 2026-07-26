@@ -11,16 +11,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build with SwiftPM
+      - name: Build with SwiftPM (unsigned)
         run: |
           rm -rf DZMeBookRead.xcodeproj
           SRC="$PWD/Reader3App"
+          DD="/tmp/derived"
           xcodebuild -scheme Reader3App-Package -destination generic/platform=iOS \
+            -derivedDataPath "$DD" \
             SWIFT_OBJC_BRIDGING_HEADER="$SRC/DZMeBookRead/other/DZMeBookRead-Bridging-Pch.h" \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
             build 2>&1 | tee /tmp/build.log | tail -5
           echo "=== ERRORS ==="
           grep -n "error:" /tmp/build.log | head -30
+
+      - name: Package IPA (unsigned)
+        run: |
+          DD="/tmp/derived"
+          APP=$(find "$DD" -name "*.app" -type d | head -1)
+          echo "Found app: $APP"
+          mkdir -p /tmp/ipa/Payload
+          cp -R "$APP" /tmp/ipa/Payload/
+          cd /tmp/ipa
+          zip -r Reader3App.ipa Payload/
+          ls -lh Reader3App.ipa
 
       - name: Upload IPA
         if: success()
