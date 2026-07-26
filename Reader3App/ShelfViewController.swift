@@ -128,6 +128,14 @@ class ShelfViewController: UIViewController {
                 recordModel.chapterModel = chapterModel
                 readModel.recordModel = recordModel
 
+                for (i, ch) in chapters.enumerated() {
+                    let lm = DZMReadChapterListModel()
+                    lm.id = NSNumber(value: i)
+                    lm.name = ch.title
+                    lm.bookID = book.bookUrl
+                    readModel.chapterListModels.append(lm)
+                }
+
                 await MainActor.run {
                     readController.readModel = readModel
                     navigationController?.pushViewController(readController, animated: true)
