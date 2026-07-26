@@ -4,6 +4,7 @@ class ShelfViewController: UIViewController {
     private var books: [Book] = []
     private var collectionView: UICollectionView!
     private let refreshControl = UIRefreshControl()
+    private var isEditingMode = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -38,7 +39,23 @@ class ShelfViewController: UIViewController {
 
     private func setupNavigationBar() {
         navigationItem.leftBarButtonItem = UIBarButtonItem(title: "搜索", style: .plain, target: self, action: #selector(showSearch))
-        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "刷新", style: .plain, target: self, action: #selector(refreshBooks))
+        updateRightBarButton()
+    }
+
+    private func updateRightBarButton() {
+        if isEditingMode {
+            navigationItem.rightBarButtonItem = UIBarButtonItem(title: "完成", style: .done, target: self, action: #selector(toggleEdit))
+        } else {
+            let editBtn = UIBarButtonItem(title: "编辑", style: .plain, target: self, action: #selector(toggleEdit))
+            let refreshBtn = UIBarButtonItem(title: "刷新", style: .plain, target: self, action: #selector(refreshBooks))
+            navigationItem.rightBarButtonItems = [refreshBtn, editBtn]
+        }
+    }
+
+    @objc private func toggleEdit() {
+        isEditingMode.toggle()
+        updateRightBarButton()
+        collectionView.reloadData()
     }
 
     @objc private func showSearch() {
@@ -89,6 +106,30 @@ class ShelfViewController: UIViewController {
                 await MainActor.run { self.refreshControl.endRefreshing() }
             }
         }
+    }
+
+    private func deleteBook(_ book: Book) {
+        let alert = UIAlertController(title: "删除书籍", message: "确定删除「\(book.name)」吗？", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
+            guard let self = self else { return }
+            Task {
+                do {
+                    try await NetworkService.shared.deleteBook(bookUrl: book.bookUrl)
+                    await MainActor.run {
+                        self.books.removeAll { $0.bookUrl == book.bookUrl }
+                        self.collectionView.reloadData()
+                    }
+                } catch {
+                    await MainActor.run {
+                        let errAlert = UIAlertController(title: "删除失败", message: error.localizedDescription, preferredStyle: .alert)
+                        errAlert.addAction(UIAlertAction(title: "确定", style: .default))
+                        self.present(errAlert, animated: true)
+                    }
+                }
+            }
+        })
+        present(alert, animated: true)
     }
 
     private func openBook(_ book: Book) {
@@ -156,11 +197,15 @@ extension ShelfViewController: UICollectionViewDataSource, UICollectionViewDeleg
 
     func collectionView(_ cv: UICollectionView, cellForItemAt ip: IndexPath) -> UICollectionViewCell {
         let cell = cv.dequeueReusableCell(withReuseIdentifier: "cell", for: ip) as! BookCell
-        cell.configure(with: books[ip.item])
+        cell.configure(with: books[ip.item], showDelete: isEditingMode)
+        cell.onDelete = { [weak self] in
+            self?.deleteBook(self!.books[ip.item])
+        }
         return cell
     }
 
     func collectionView(_: UICollectionView, didSelectItemAt ip: IndexPath) {
+        guard !isEditingMode else { return }
         openBook(books[ip.item])
     }
 }
@@ -169,6 +214,8 @@ class BookCell: UICollectionViewCell {
     private let coverView = UIImageView()
     private let nameLabel = UILabel()
     private let authorLabel = UILabel()
+    private let deleteButton = UIButton(type: .system)
+    var onDelete: (() -> Void)?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -185,7 +232,7 @@ class BookCell: UICollectionViewCell {
         authorLabel.textColor = .secondaryLabel
         authorLabel.textAlignment = .center
         authorLabel.numberOfLines = 1
-        [coverView, nameLabel, authorLabel].forEach {
+        [coverView, nameLabel, authorLabel, deleteButton].forEach {
             contentView.addSubview($0)
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
@@ -201,13 +248,29 @@ class BookCell: UICollectionViewCell {
             authorLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
             authorLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
         ])
+        deleteButton.setTitle("✕", for: .normal)
+        deleteButton.backgroundColor = UIColor(red: 1, green: 0.23, blue: 0.19, alpha: 1)
+        deleteButton.setTitleColor(.white, for: .normal)
+        deleteButton.layer.cornerRadius = 12
+        deleteButton.titleLabel?.font = .boldSystemFont(ofSize: 14)
+        deleteButton.isHidden = true
+        deleteButton.addTarget(self, action: #selector(didTapDelete), for: .touchUpInside)
+        NSLayoutConstraint.activate([
+            deleteButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: -4),
+            deleteButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: 4),
+            deleteButton.widthAnchor.constraint(equalToConstant: 24),
+            deleteButton.heightAnchor.constraint(equalToConstant: 24),
+        ])
     }
 
     required init?(coder: NSCoder) { nil }
 
-    func configure(with book: Book) {
+    @objc private func didTapDelete() { onDelete?() }
+
+    func configure(with book: Book, showDelete: Bool = false) {
         nameLabel.text = book.name
         authorLabel.text = book.author
+        deleteButton.isHidden = !showDelete
         if let url = book.coverImageURL {
             URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
                 if let d = data { DispatchQueue.main.async { self?.coverView.image = UIImage(data: d) } }
