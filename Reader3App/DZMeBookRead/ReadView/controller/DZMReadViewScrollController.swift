@@ -14,7 +14,7 @@ class DZMReadViewScrollController: DZMViewController, UITableViewDelegate, UITab
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        let cm = vc.readModel.recordModel.chapterModel
+        guard let cm = vc.readModel.recordModel.chapterModel else { return }
         chapterIDs.append(cm.id)
         chapterModels[cm.id.stringValue] = cm
         reloadProgress()
