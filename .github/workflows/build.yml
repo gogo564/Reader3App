@@ -11,34 +11,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install XcodeGen
+        run: brew install xcodegen 2>&1 | tail -3
+
+      - name: Generate xcodeproj with XcodeGen
+        run: xcodegen generate --project . 2>&1
+
       - name: Archive (unsigned)
         run: |
-          rm -rf DZMeBookRead.xcodeproj
-          SRC="$PWD/Reader3App"
-          xcodebuild -scheme Reader3App-Package -destination generic/platform=iOS \
+          xcodebuild -project Reader3App.xcodeproj -scheme Reader3App -destination generic/platform=iOS \
             -archivePath /tmp/Reader3App.xcarchive \
-            SWIFT_OBJC_BRIDGING_HEADER="$SRC/DZMeBookRead/other/DZMeBookRead-Bridging-Pch.h" \
-            SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG" \
-            PRODUCT_TYPE="com.apple.product-type.application" \
-            INFOPLIST_FILE="$SRC/Info.plist" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
-            archive 2>&1 | tail -20
-          echo "=== CHECK ==="
-          find /tmp/Reader3App.xcarchive -name "*.app" -type d 2>/dev/null | head -3
-          ls -la /tmp/Reader3App.xcarchive/Products/Applications/ 2>/dev/null
+            archive 2>&1 | tail -10
 
       - name: Package IPA
         run: |
-          APP=$(find /tmp/Reader3App.xcarchive -name "*.app" -type d 2>/dev/null | head -1)
-          if [ -z "$APP" ]; then
-            echo "No .app found, trying DerivedData..."
-            APP=$(find ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d 2>/dev/null | head -1)
-          fi
+          APP=$(find /tmp/Reader3App.xcarchive -name "*.app" -type d | head -1)
+          echo "App: $APP"
           if [ -z "$APP" ]; then
             echo "ERROR: no .app found"
             exit 1
           fi
-          echo "App: $APP"
           mkdir -p /tmp/ipa/Payload
           cp -R "$APP" /tmp/ipa/Payload/
           cd /tmp/ipa

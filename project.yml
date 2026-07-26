@@ -1,0 +1,53 @@
+name: Reader3App
+options:
+  bundleIdPrefix: reader3app
+  deploymentTarget:
+    iOS: "15.0"
+
+settings:
+  SWIFT_OBJC_BRIDGING_HEADER: Reader3App/DZMeBookRead/other/DZMeBookRead-Bridging-Pch.h
+  HEADER_SEARCH_PATHS:
+    - Reader3App/DZMeBookRead/other
+    - Reader3App/DZMeBookRead/other/thirdParty/ASValueTrackingSlider
+    - Reader3App/DZMeBookRead/other/thirdParty/DZMCoverController
+    - Reader3App/DZMeBookRead/other/thirdParty/DZMMagnifierView
+    - Reader3App/DZMeBookRead/other/thirdParty/DZMSegmentedControl
+    - Reader3App/DZMeBookRead/other/thirdParty/FDFullscreenPopGesture
+
+targets:
+  Reader3App:
+    type: application
+    platform: iOS
+    sources:
+      - Reader3App/AppDelegate.swift
+      - Reader3App/Extensions.swift
+      - Reader3App/Models.swift
+      - Reader3App/SearchViewController.swift
+      - Reader3App/SetupViewController.swift
+      - Reader3App/ShelfViewController.swift
+      - Reader3App/Services/AppState.swift
+      - Reader3App/Services/NetworkService.swift
+      - Reader3App/DZMeBookRead
+    settings:
+      base:
+        INFOPLIST_FILE: Reader3App/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: reader3app.Reader3App
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: "NO"
+    dependencies:
+      - target: ObjCThirdParty
+
+  ObjCThirdParty:
+    type: static-library
+    platform: iOS
+    sources:
+      - Reader3App/DZMeBookRead/other/thirdParty/ASValueTrackingSlider/ASValuePopUpView.m
+      - Reader3App/DZMeBookRead/other/thirdParty/ASValueTrackingSlider/ASValueTrackingSlider.m
+      - Reader3App/DZMeBookRead/other/thirdParty/DZMCoverController/DZMCoverController.m
+      - Reader3App/DZMeBookRead/other/thirdParty/DZMMagnifierView/DZMMagnifierView.m
+      - Reader3App/DZMeBookRead/other/thirdParty/DZMSegmentedControl/DZMSegmentedControl.m
+      - Reader3App/DZMeBookRead/other/thirdParty/FDFullscreenPopGesture/UINavigationController+FDFullscreenPopGesture.m
+    settings:
+      base:
+        PRODUCT_NAME: ObjCThirdParty
