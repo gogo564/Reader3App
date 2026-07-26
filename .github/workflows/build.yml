@@ -7,24 +7,38 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    strategy:
+      matrix:
+        runner: [macos-13, macos-14, macos-15]
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
-      - name: Try Rosetta x86_64
+      - name: Build
         run: |
-          arch -x86_64 /Applications/Xcode_16.4.app/Contents/Developer/usr/bin/xcodebuild archive \
+          sudo xcode-select -s /Applications/Xcode_15.4.app 2>/dev/null || true
+          echo "Running on ${{ matrix.runner }}"
+          xcodebuild archive \
             -project DZMeBookRead.xcodeproj \
             -scheme Reader3App \
             -configuration Release \
-            -archivePath /tmp/ra.xcarchive \
+            -archivePath /tmp/ipa.xcarchive \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -10
+
+      - name: Export IPA
+        if: success()
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath /tmp/ipa.xcarchive \
+            -exportPath /tmp/ipa \
+            -exportOptionsPlist exportOptions.plist
 
       - name: Upload IPA
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Reader3App.ipa
+          name: Reader3App-${{ matrix.runner }}.ipa
           path: /tmp/ipa/Reader3App.ipa
