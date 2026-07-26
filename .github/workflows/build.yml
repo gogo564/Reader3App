@@ -11,8 +11,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Try auto-detect
+      - name: Cleanup and validate
         run: |
-          xcodebuild -list 2>&1 | head -10
-          echo "---"
-          xcodebuild -scheme Reader3App -list 2>&1 | head -10 || true
+          git clean -fd DZMeBookRead.xcodeproj/
+          ls -la DZMeBookRead.xcodeproj/
+          echo "=== Validate pbxproj references ==="
+          python3 -c "
+import plistlib, re
+with open('DZMeBookRead.xcodeproj/project.pbxproj', 'rb') as f:
+    raw = f.read()
+# Convert old-style plist to make it parseable
+import subprocess
+r = subprocess.run(['plutil', '-convert', 'json1', '-o', '-', 'DZMeBookRead.xcodeproj/project.pbxproj'], capture_output=True)
+if r.returncode == 0:
+    import json
+    data = json.loads(r.stdout)
+    objs = data.get('objects', {})
+    print(f'Total objects: {len(objs)}')
+    # Check some references
+    bf_count = sum(1 for v in objs.values() if isinstance(v, dict) and v.get('isa') == 'PBXBuildFile')
+    fr_count = sum(1 for v in objs.values() if isinstance(v, dict) and v.get('isa') == 'PBXFileReference')
+    print(f'BuildFiles: {bf_count}, FileRefs: {fr_count}')
+    # Check all build file refs exist
+    bf_refs = [v['fileRef'] for v in objs.values() if isinstance(v, dict) and v.get('isa') == 'PBXBuildFile']
+    missing = [r for r in bf_refs if r not in objs]
+    print(f'Missing refs in BuildFiles: {len(missing)}')
+    if missing:
+        print(f'First 5 missing: {missing[:5]}')
+    print('Validation done')
+else:
+    print('plutil json1 failed:', r.stderr.decode())
+"
+
+      - name: Build
+        run: |
+          xcodebuild archive \
+            -project DZMeBookRead.xcodeproj \
+            -scheme Reader3App \
+            -configuration Release \
+            -archivePath /tmp/ipa.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
