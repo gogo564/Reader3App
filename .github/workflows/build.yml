@@ -14,7 +14,9 @@ jobs:
       - name: Build with SwiftPM
         run: |
           rm -rf DZMeBookRead.xcodeproj
-          xcodebuild -scheme Reader3App-Package -destination generic/platform=iOS build 2>&1 | tail -80
+          xcodebuild -scheme Reader3App-Package -destination generic/platform=iOS build 2>&1 | tee /tmp/build.log | tail -5
+          echo "=== ERRORS ==="
+          grep -n "error:" /tmp/build.log | head -30
 
       - name: Upload IPA
         if: success()
