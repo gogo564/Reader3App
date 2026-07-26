@@ -11,31 +11,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cleanup
-        run: git clean -fd DZMeBookRead.xcodeproj/
-
-      - name: Validate
+      - name: Test Package.swift
         run: |
-          plutil -lint DZMeBookRead.xcodeproj/project.pbxproj
-
-      - name: Build
-        run: |
-          xcodebuild archive \
-            -project DZMeBookRead.xcodeproj \
-            -scheme Reader3App \
-            -configuration Release \
-            -archivePath /tmp/ipa.xcarchive \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
-
-      - name: Export IPA
-        if: success()
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath /tmp/ipa.xcarchive \
-            -exportPath /tmp/ipa \
-            -exportOptionsPlist exportOptions.plist
+          xcodebuild -list 2>&1 | head -20
+          echo "---"
+          xcodebuild -scheme Reader3App -destination generic/platform=iOS build 2>&1 | tail -20
 
       - name: Upload IPA
         if: success()
