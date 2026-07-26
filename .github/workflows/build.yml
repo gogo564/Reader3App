@@ -29,17 +29,29 @@ jobs:
           tail -5 DZMeBookRead.xcodeproj/project.pbxproj
           file DZMeBookRead.xcodeproj/project.pbxproj
 
-      - name: Try to open project
+      - name: Diagnose xcodebuild
         run: |
           echo "=== xattr ==="
           xattr -l DZMeBookRead.xcodeproj/project.pbxproj 2>&1 || echo "no xattr"
           ls -la@ DZMeBookRead.xcodeproj/ 2>&1 || ls -la DZMeBookRead.xcodeproj/
-          echo "=== Try older Xcode ==="
-          ls /Applications/Xcode*.app/Contents/Developer/usr/bin/xcodebuild 2>/dev/null || echo "no other Xcode"
+          echo "=== Test different Xcode versions ==="
+          mkdir -p /tmp/xctest
+          echo "int main(){}" > /tmp/xctest/main.c
+          for ver in 16.2 16.1 15.4 15.3 15.2 15.1 15.0; do
+            path="/Applications/Xcode_${ver}.app"
+            if [ -f "$path/Contents/Developer/usr/bin/xcodebuild" ]; then
+              echo "--- Xcode $ver ---"
+              sudo xcode-select -s "$path" 2>/dev/null
+              xcodebuild -version 2>&1 | head -1
+              xcodebuild -list -project DZMeBookRead.xcodeproj 2>&1 | head -2 || true
+            fi
+          done
+          echo "=== Restore Xcode 15.4 ==="
+          sudo xcode-select -s /Applications/Xcode_15.4.app
           echo "=== swift build test ==="
-          cd /tmp && mkdir -p swift-test && cd swift-test
+          cd /tmp && rm -rf swift-test && mkdir -p swift-test && cd swift-test
           swift package init --type executable 2>&1 || true
-          swift build 2>&1 | tail -5 || true
+          swift build 2>&1 | tail -3 || true
 
       - name: Build Archive
         run: |
