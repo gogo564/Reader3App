@@ -11,13 +11,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build with xcodebuild
+      - name: Ultimate diagnostics
         run: |
-          ls -la /Applications/Xcode*.app/Contents/Developer/usr/bin/xcodebuild 2>/dev/null | head -3
-          echo "=== Check xcrun ==="
-          xcrun --find xcodebuild 2>&1 || true
-          echo "=== Try xcodebuild -verbose ==="
-          xcodebuild -verbose -list -project DZMeBookRead.xcodeproj 2>&1 | head -20 || true
+          echo "=== Does any xcodebuild work? ==="
+          cd /tmp
+          mkdir -p testapp && cd testapp
+          swift package init --type executable 2>&1 | tail -3
+          swift build 2>&1 | tail -3
+          echo "=== Can xcodebuild read ANYTHING? ==="
+          xcodebuild -version
+          cd /tmp/testapp
+          xcodebuild -list 2>&1 | head -5 || echo "xcodebuild failed in /tmp/testapp"
+          echo "=== Check Toolchain ==="
+          xcrun --show-sdk-path 2>&1
+          echo "=== Try pipe through cat ==="
+          cat /dev/null | xcodebuild -version
 
       - name: Upload IPA
         if: success()
