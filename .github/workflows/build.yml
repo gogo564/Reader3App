@@ -11,16 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Remove workspace and build
+      - name: Try Rosetta x86_64
         run: |
-          rm -rf DZMeBookRead.xcodeproj/project.xcworkspace
-          xcodebuild archive \
+          arch -x86_64 /Applications/Xcode_16.4.app/Contents/Developer/usr/bin/xcodebuild archive \
             -project DZMeBookRead.xcodeproj \
             -scheme Reader3App \
             -configuration Release \
-            -archivePath /tmp/Reader3App.xcarchive \
-            IDEPackageSupportUseBuiltinSCM=NO \
-            IDESuppressIndexing=YES \
+            -archivePath /tmp/ra.xcarchive \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
