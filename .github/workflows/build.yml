@@ -11,21 +11,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Ultimate diagnostics
+      - name: Build
         run: |
-          echo "=== Does any xcodebuild work? ==="
-          cd /tmp
-          mkdir -p testapp && cd testapp
-          swift package init --type executable 2>&1 | tail -3
-          swift build 2>&1 | tail -3
-          echo "=== Can xcodebuild read ANYTHING? ==="
-          xcodebuild -version
-          cd /tmp/testapp
-          xcodebuild -list 2>&1 | head -5 || echo "xcodebuild failed in /tmp/testapp"
-          echo "=== Check Toolchain ==="
-          xcrun --show-sdk-path 2>&1
-          echo "=== Try pipe through cat ==="
-          cat /dev/null | xcodebuild -version
+          export DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer
+          xcodebuild archive \
+            -project DZMeBookRead.xcodeproj \
+            -scheme Reader3App \
+            -configuration Release \
+            -archivePath /tmp/ipa.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
+
+      - name: Export IPA
+        if: success()
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath /tmp/ipa.xcarchive \
+            -exportPath /tmp/ipa \
+            -exportOptionsPlist exportOptions.plist
 
       - name: Upload IPA
         if: success()
