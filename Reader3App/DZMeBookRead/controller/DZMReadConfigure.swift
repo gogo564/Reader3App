@@ -109,21 +109,8 @@ class DZMReadConfigure: NSObject {
     /// 字体颜色
     var textColor:UIColor! {
         
-        // 固定颜色
+        if bgColorIndex.intValue == 4 { return RGB(200, 200, 200) }
         return RGB(58, 58, 58)
-    
-        // 根据背景颜色选择
-//        return DZM_READ_TEXT_COLORS[bgColorIndex.intValue]
-        
-        // 字体颜色列表选择
-//        return DZM_READ_TEXT_COLORS[textColorIndex.intValue]
-        
-        // 日夜间切换
-//         if DZMUserDefaults.bool(DZM_READ_KEY_MODE_DAY_NIGHT) {
-//
-//            return DZM_COLOR_145_145_145
-//
-//         }else{ return DZM_COLOR_145_145_145 }
     }
     
     /// 状态栏字体颜色
