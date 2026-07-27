@@ -110,6 +110,22 @@ class CacheManager {
         try? content.write(to: f, atomically: true, encoding: .utf8)
     }
 
+    func updateBookProgress(bookUrl: String, index: Int, title: String?, time: Int64) {
+        var books = getCachedBookshelf() ?? []
+        if let idx = books.firstIndex(where: { $0.bookUrl == bookUrl }) {
+            let old = books[idx]
+            books[idx] = old.withProgress(index: index, title: title, time: time)
+        } else {
+            let b = Book(bookUrl: bookUrl, name: title ?? "", durChapterIndex: index, durChapterTitle: title, durChapterTime: time)
+            books.append(b)
+        }
+        cacheBookshelf(books)
+    }
+
+    func findCachedBook(bookUrl: String) -> Book? {
+        getCachedBookshelf()?.first(where: { $0.bookUrl == bookUrl })
+    }
+
     func clearCache(bookUrl: String) {
         let d = bookDir(bookUrl)
         try? FileManager.default.removeItem(at: d)

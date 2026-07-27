@@ -51,12 +51,14 @@ class SyncQueue: NSObject {
         var remaining = ops
         for op in ops {
             do {
-                if op.type == .saveProgress, let serverBook = serverBooks[op.bookUrl],
+                if op.type == .saveProgress,
                    let localDict = (try? JSONSerialization.jsonObject(with: op.payload)) as? [String: Any],
-                   let localTime = localDict["time"] as? TimeInterval,
-                   let serverTime = serverBook.durChapterTime, Double(serverTime) >= localTime {
-                    remaining.removeAll { $0.id == op.id }
-                    continue
+                   let localTime = localDict["durChapterTime"] as? Int64 {
+                    if let serverBook = serverBooks[op.bookUrl],
+                       let serverTime = serverBook.durChapterTime, serverTime >= localTime {
+                        remaining.removeAll { $0.id == op.id }
+                        continue
+                    }
                 }
                 try await execute(op)
                 remaining.removeAll { $0.id == op.id }
@@ -71,10 +73,11 @@ class SyncQueue: NSObject {
         switch op.type {
         case .saveProgress:
             guard let dict = try JSONSerialization.jsonObject(with: op.payload) as? [String: Any],
-                  let url = dict["url"] as? String,
-                  let index = dict["index"] as? Int else { return }
-            let time = dict["time"] as? TimeInterval
-            try await NetworkService.shared.saveBookProgress(bookUrl: url, index: index, time: time)
+                  let url = dict["bookUrl"] as? String,
+                  let index = dict["durChapterIndex"] as? Int else { return }
+            let title = dict["durChapterTitle"] as? String
+            let time = dict["durChapterTime"] as? Int64 ?? Int64(Date().timeIntervalSince1970 * 1000)
+            try await NetworkService.shared.saveBookProgress(bookUrl: url, index: index, title: title, time: time)
         case .saveBookmark:
             let item = try JSONDecoder().decode(BookmarkItem.self, from: op.payload)
             try await NetworkService.shared.saveBookmark(item)

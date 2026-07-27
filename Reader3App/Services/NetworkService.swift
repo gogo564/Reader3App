@@ -123,11 +123,14 @@ class NetworkService {
         return content
     }
 
-    func saveBookProgress(bookUrl: String, index: Int, time: TimeInterval? = nil) async throws {
-        var dict: [String: Any] = ["url": bookUrl, "index": index]
-        if let t = time { dict["time"] = t }
-        let body = try JSONSerialization.data(withJSONObject: dict)
-        _ = try await post("/saveBookProgress", body: body)
+    func saveBookProgress(bookUrl: String, index: Int, title: String? = nil, time: Int64) async throws {
+        guard var book = CacheManager.shared.findCachedBook(bookUrl: bookUrl) else {
+            let b = Book(bookUrl: bookUrl, name: title ?? "", durChapterIndex: index, durChapterTitle: title, durChapterTime: time)
+            _ = try await saveBook(b)
+            return
+        }
+        book = book.withProgress(index: index, title: title, time: time)
+        _ = try await saveBook(book)
     }
 
     // MARK: - Bookmarks
