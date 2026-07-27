@@ -65,7 +65,7 @@ class DZMReadModel: NSObject {
     }
 
     func removeAllMark() {
-        let oldMarks = markModels
+        let oldMarks = markModels ?? []
         markModels.removeAll()
         saveMarks()
         for mark in oldMarks {
