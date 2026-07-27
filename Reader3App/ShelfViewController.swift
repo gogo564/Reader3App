@@ -207,6 +207,7 @@ class ShelfViewController: UIViewController {
                 let chapters = try await NetworkService.shared.getChapterList(bookUrl: book.bookUrl)
                 let total = chapters.count
                 CacheManager.shared.setCachedTotal(book.bookUrl, total: total)
+                CacheManager.shared.cacheChapters(bookUrl: book.bookUrl, chapters: chapters)
                 for (i, _) in chapters.enumerated() {
                     if CacheManager.shared.isChapterCached(bookUrl: book.bookUrl, index: i) { continue }
                     let content = try await NetworkService.shared.getBookContent(bookUrl: book.bookUrl, index: i)
@@ -244,8 +245,11 @@ class ShelfViewController: UIViewController {
         readModel.bookName = book.name
         readModel.loadMarks()
 
-        readController.chapterList = { bookUrl in
-            try await NetworkService.shared.getChapterList(bookUrl: bookUrl)
+        readController.chapterList = { [weak self] bookUrl in
+            if let cached = self?.chapterListCache(bookUrl: bookUrl) { return cached }
+            let chapters = try await NetworkService.shared.getChapterList(bookUrl: bookUrl)
+            CacheManager.shared.cacheChapters(bookUrl: bookUrl, chapters: chapters)
+            return chapters
         }
         readController.chapterContent = { [weak self] bookUrl, index in
             if let c = self?.cachedContent(bookUrl: bookUrl, index: index) { return c }
@@ -290,6 +294,30 @@ class ShelfViewController: UIViewController {
                 }
             } catch {
                 await MainActor.run {
+                    if let cached = self.cachedContent(bookUrl: book.bookUrl, index: book.durChapterIndex ?? 0) {
+                        readModel.chapterListModels = []
+                        let lm = DZMReadChapterListModel()
+                        lm.id = NSNumber(value: book.durChapterIndex ?? 0)
+                        lm.name = book.durChapterTitle ?? "开始阅读"
+                        lm.bookID = book.bookUrl
+                        readModel.chapterListModels.append(lm)
+                        let cm = DZMReadChapterModel()
+                        cm.bookID = book.bookUrl
+                        cm.id = NSNumber(value: book.durChapterIndex ?? 0)
+                        cm.name = book.durChapterTitle ?? "开始阅读"
+                        cm.content = DZMReadParser.contentTypesetting(content: cached)
+                        cm.priority = NSNumber(value: book.durChapterIndex ?? 0)
+                        cm.previousChapterID = DZM_READ_NO_MORE_CHAPTER
+                        cm.nextChapterID = DZM_READ_NO_MORE_CHAPTER
+                        cm.updateFont()
+                        let rm = DZMReadRecordModel()
+                        rm.bookID = book.bookUrl
+                        rm.chapterModel = cm
+                        readModel.recordModel = rm
+                        readController.readModel = readModel
+                        navigationController?.pushViewController(readController, animated: true)
+                        return
+                    }
                     let msg: String
                     if !NetworkMonitor.shared.isConnected {
                         msg = "当前无网络连接，请联网后重试"
@@ -302,6 +330,11 @@ class ShelfViewController: UIViewController {
                 }
             }
         }
+    }
+
+    private func chapterListCache(bookUrl: String) -> [Chapter]? {
+        guard CacheManager.shared.cachedCount(bookUrl) > 0 else { return nil }
+        return CacheManager.shared.getCachedChapters(bookUrl: bookUrl)
     }
 }
 

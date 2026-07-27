@@ -10,14 +10,34 @@ class CacheManager {
         return c
     }
 
+    private func stableKey(_ bookUrl: String) -> String {
+        bookUrl.data(using: .utf8)!.base64EncodedString()
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
     private func bookDir(_ bookUrl: String) -> URL {
-        let key = String(bookUrl.hashValue)
+        let key = stableKey(bookUrl)
         let d = cacheDir.appendingPathComponent(key)
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d
     }
 
     private func totalKey(_ bookUrl: String) -> String { "cache_total_\(bookUrl)" }
+
+    func cacheChapters(bookUrl: String, chapters: [Chapter]) {
+        let f = bookDir(bookUrl).appendingPathComponent("chapters.json")
+        if let data = try? JSONEncoder().encode(chapters) {
+            try? data.write(to: f)
+        }
+    }
+
+    func getCachedChapters(bookUrl: String) -> [Chapter]? {
+        let f = bookDir(bookUrl).appendingPathComponent("chapters.json")
+        guard let data = try? Data(contentsOf: f) else { return nil }
+        return try? JSONDecoder().decode([Chapter].self, from: data)
+    }
 
     func cachedCount(_ bookUrl: String) -> Int {
         let d = bookDir(bookUrl)
