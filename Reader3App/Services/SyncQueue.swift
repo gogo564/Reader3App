@@ -11,8 +11,9 @@ struct SyncOperation: Codable {
     let payload: Data
 }
 
-class SyncQueue {
+class SyncQueue: NSObject {
     static let shared = SyncQueue()
+    private override init() {}
 
     private var queue: [SyncOperation] {
         get {
