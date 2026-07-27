@@ -91,14 +91,30 @@ class ShelfViewController: UIViewController {
             tv.bottomAnchor.constraint(equalTo: vc.view.bottomAnchor),
         ])
         vc.title = "崩溃日志"
+        vc.navigationItem.leftBarButtonItem = UIBarButtonItem(title: "清除", style: .plain, target: self, action: #selector(clearCrashLog(sender:)))
         vc.navigationItem.rightBarButtonItem = UIBarButtonItem(title: "关闭", style: .done, target: self, action: #selector(dismissLog))
-        let nav = UINavigationController(rootViewController: vc)
-        nav.modalPresentationStyle = .fullScreen
-        present(nav, animated: true)
+        logNav = UINavigationController(rootViewController: vc)
+        logNav!.modalPresentationStyle = .fullScreen
+        present(logNav!, animated: true)
+    }
+
+    private weak var logNav: UINavigationController?
+
+    @objc private func clearCrashLog(sender: UIBarButtonItem) {
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("crash.log")
+        guard let u = url else { return }
+        do {
+            try "".write(to: u, atomically: true, encoding: .utf8)
+        } catch {}
+        if let vc = logNav?.viewControllers.first as? UIViewController,
+           let tv = vc.view.subviews.first as? UITextView {
+            tv.text = "暂无崩溃日志"
+        }
     }
 
     @objc private func dismissLog() {
         dismiss(animated: true)
+        logNav = nil
     }
 
     private func addAndOpen(_ result: SearchResult) {
