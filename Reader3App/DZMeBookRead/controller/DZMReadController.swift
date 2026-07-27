@@ -62,7 +62,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     
     private func saveReadingProgress() {
         guard let rm = readModel?.recordModel, let chapterID = rm.chapterModel?.id else { return }
-        let bookUrl = readModel.bookID
+        let bookUrl = readModel.bookID ?? ""
         let index = chapterID.intValue
         let payload = (try? JSONSerialization.data(withJSONObject: ["url": bookUrl, "index": index])) ?? Data()
         if NetworkMonitor.shared.isConnected {
