@@ -202,7 +202,7 @@ class ShelfViewController: UIViewController {
         present(logNav!, animated: true)
     }
 
-    private weak var logNav: UINavigationController?
+    private var logNav: UINavigationController?
 
     @objc private func clearCrashLog(sender: UIBarButtonItem) {
         let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("crash.log")

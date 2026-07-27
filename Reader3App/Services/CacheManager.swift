@@ -116,7 +116,7 @@ class CacheManager {
             let old = books[idx]
             books[idx] = old.withProgress(index: index, title: title, time: time)
         } else {
-            let b = Book(bookUrl: bookUrl, name: title ?? "", durChapterIndex: index, durChapterTitle: title, durChapterTime: time)
+            let b = Book(bookUrl: bookUrl, name: title ?? "", author: nil, durChapterIndex: index, durChapterTitle: title, durChapterTime: time)
             books.append(b)
         }
         cacheBookshelf(books)
