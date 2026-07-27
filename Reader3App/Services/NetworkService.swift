@@ -125,7 +125,7 @@ class NetworkService {
 
     func saveBookProgress(bookUrl: String, index: Int, title: String? = nil, time: Int64) async throws {
         guard var book = CacheManager.shared.findCachedBook(bookUrl: bookUrl) else {
-            let b = Book(bookUrl: bookUrl, name: title ?? "", author: nil, durChapterIndex: index, durChapterTitle: title, durChapterTime: time)
+            let b = Book(bookUrl: bookUrl, name: title ?? "", author: nil, durChapterTitle: title, durChapterIndex: index, durChapterTime: time)
             _ = try await saveBook(b)
             return
         }
