@@ -194,12 +194,19 @@ class ShelfViewController: UIViewController {
     }
 
     private func cacheBook(_ book: Book) {
+        guard NetworkMonitor.shared.isConnected else {
+            let alert = UIAlertController(title: "缓存失败", message: "当前无网络连接，请联网后重试", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(alert, animated: true)
+            return
+        }
         let alert = UIAlertController(title: "缓存中", message: "开始缓存...", preferredStyle: .alert)
         present(alert, animated: true)
         Task {
             do {
                 let chapters = try await NetworkService.shared.getChapterList(bookUrl: book.bookUrl)
                 let total = chapters.count
+                CacheManager.shared.setCachedTotal(book.bookUrl, total: total)
                 for (i, _) in chapters.enumerated() {
                     if CacheManager.shared.isChapterCached(bookUrl: book.bookUrl, index: i) { continue }
                     let content = try await NetworkService.shared.getBookContent(bookUrl: book.bookUrl, index: i)
@@ -283,7 +290,13 @@ class ShelfViewController: UIViewController {
                 }
             } catch {
                 await MainActor.run {
-                    let alert = UIAlertController(title: "加载失败", message: error.localizedDescription, preferredStyle: .alert)
+                    let msg: String
+                    if !NetworkMonitor.shared.isConnected {
+                        msg = "当前无网络连接，请联网后重试"
+                    } else {
+                        msg = error.localizedDescription
+                    }
+                    let alert = UIAlertController(title: "加载失败", message: msg, preferredStyle: .alert)
                     alert.addAction(UIAlertAction(title: "确定", style: .default))
                     self.present(alert, animated: true)
                 }
@@ -403,14 +416,19 @@ class BookCell: UICollectionViewCell {
             progressLabel.text = "未阅读"
         }
         let cached = CacheManager.shared.cachedCount(book.bookUrl)
-        if cached > 0 {
+        let total = CacheManager.shared.cachedTotal(book.bookUrl)
+        if cached == 0 {
+            cacheButton.setTitle("缓存", for: .normal)
+            cacheButton.isEnabled = true
+            cacheLabel.text = ""
+        } else if total > 0 && cached >= total {
             cacheButton.setTitle("已缓存", for: .normal)
             cacheButton.isEnabled = false
             cacheLabel.text = "\(cached)章"
         } else {
-            cacheButton.setTitle("缓存", for: .normal)
+            cacheButton.setTitle("继续缓存", for: .normal)
             cacheButton.isEnabled = true
-            cacheLabel.text = ""
+            cacheLabel.text = "\(cached)/\(max(total, cached))章"
         }
         if let url = book.coverImageURL {
             URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in

@@ -170,7 +170,8 @@ struct Chapter: Codable, Identifiable, Hashable {
 }
 
 struct BookmarkItem: Codable, Identifiable {
-    var id: String { "\(bookName)-\(bookAuthor)-\(chapterIndex)-\(chapterPos)" }
+    var id: String { "\(bookUrl)-\(chapterIndex)-\(chapterPos)" }
+    let bookUrl: String
     let time: Int64
     let bookName: String
     let bookAuthor: String

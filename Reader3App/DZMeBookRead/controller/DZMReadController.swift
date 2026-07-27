@@ -61,6 +61,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     }
     
     private func saveReadingProgress() {
+        guard NetworkMonitor.shared.isConnected else { return }
         guard let rm = readModel?.recordModel, let chapterID = rm.chapterModel?.id else { return }
         Task {
             try? await NetworkService.shared.saveBookProgress(bookUrl: readModel.bookID, index: chapterID.intValue)

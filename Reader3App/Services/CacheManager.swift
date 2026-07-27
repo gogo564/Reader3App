@@ -17,13 +17,27 @@ class CacheManager {
         return d
     }
 
-    var cachedBooks: [String: Int] {
-        guard let data = UserDefaults.standard.data(forKey: "cache_manifest"),
-              let dict = try? JSONDecoder().decode([String: Int].self, from: data) else { return [:] }
-        return dict
+    private func totalKey(_ bookUrl: String) -> String { "cache_total_\(bookUrl)" }
+
+    func cachedCount(_ bookUrl: String) -> Int {
+        let d = bookDir(bookUrl)
+        guard let files = try? FileManager.default.contentsOfDirectory(atPath: d.path) else { return 0 }
+        return files.filter { $0.hasSuffix(".txt") }.count
     }
 
-    func cachedCount(_ bookUrl: String) -> Int { cachedBooks[bookUrl] ?? 0 }
+    func cachedTotal(_ bookUrl: String) -> Int {
+        UserDefaults.standard.integer(forKey: totalKey(bookUrl))
+    }
+
+    func setCachedTotal(_ bookUrl: String, total: Int) {
+        UserDefaults.standard.set(total, forKey: totalKey(bookUrl))
+    }
+
+    func isFullyCached(bookUrl: String) -> Bool {
+        let total = cachedTotal(bookUrl)
+        guard total > 0 else { return false }
+        return cachedCount(bookUrl) >= total
+    }
 
     func isChapterCached(bookUrl: String, index: Int) -> Bool {
         let f = bookDir(bookUrl).appendingPathComponent("\(index).txt")
@@ -38,20 +52,11 @@ class CacheManager {
     func cacheChapter(bookUrl: String, index: Int, content: String) {
         let f = bookDir(bookUrl).appendingPathComponent("\(index).txt")
         try? content.write(to: f, atomically: true, encoding: .utf8)
-        var m = cachedBooks
-        m[bookUrl] = (m[bookUrl] ?? 0) + 1
-        if let data = try? JSONEncoder().encode(m) {
-            UserDefaults.standard.set(data, forKey: "cache_manifest")
-        }
     }
 
     func clearCache(bookUrl: String) {
         let d = bookDir(bookUrl)
         try? FileManager.default.removeItem(at: d)
-        var m = cachedBooks
-        m.removeValue(forKey: bookUrl)
-        if let data = try? JSONEncoder().encode(m) {
-            UserDefaults.standard.set(data, forKey: "cache_manifest")
-        }
+        UserDefaults.standard.removeObject(forKey: totalKey(bookUrl))
     }
 }

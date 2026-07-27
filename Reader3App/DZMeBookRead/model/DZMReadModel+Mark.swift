@@ -25,8 +25,11 @@ extension DZMReadModel {
     }
 
     func removeMark(index: NSInteger) -> Bool {
+        guard index >= 0 && index < markModels.count else { return false }
+        let mark = markModels[index]
         markModels.remove(at: index)
         saveMarks()
+        syncDeleteMark(mark)
         return true
     }
 
