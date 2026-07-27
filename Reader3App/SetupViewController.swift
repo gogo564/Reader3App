@@ -70,6 +70,7 @@ class SetupViewController: UIViewController {
         view.addSubview(errorLabel)
         errorLabel.translatesAutoresizingMaskIntoConstraints = false
 
+        setupOfflineButton()
         NSLayoutConstraint.activate([
             icon.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             icon.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 80),
@@ -94,6 +95,8 @@ class SetupViewController: UIViewController {
         ])
     }
 
+    private let offlineButton = UIButton(type: .system)
+
     @objc private func connect() {
         guard var text = urlField.text?.trimmingCharacters(in: .whitespaces), !text.isEmpty else {
             errorLabel.text = "请输入服务器地址"
@@ -105,6 +108,7 @@ class SetupViewController: UIViewController {
         errorLabel.text = nil
         loading.startAnimating()
         connectButton.isEnabled = false
+        offlineButton.isHidden = true
 
         Task {
             do {
@@ -122,9 +126,34 @@ class SetupViewController: UIViewController {
                     errorLabel.text = "连接失败: \(error.localizedDescription)"
                     loading.stopAnimating()
                     connectButton.isEnabled = true
+                    if UserDefaults.standard.string(forKey: "serverURL") != nil {
+                        self.offlineButton.isHidden = false
+                    }
                 }
             }
         }
+    }
+
+    @objc private func goOffline() {
+        guard let saved = UserDefaults.standard.string(forKey: "serverURL") else { return }
+        AppState.shared.serverURL = saved
+        AppState.shared.isConnected = false
+        let shelf = ShelfViewController()
+        navigationController?.setViewControllers([shelf], animated: true)
+    }
+
+    private func setupOfflineButton() {
+        offlineButton.setTitle("离线阅读", for: .normal)
+        offlineButton.titleLabel?.font = .systemFont(ofSize: 15)
+        offlineButton.setTitleColor(.systemBlue, for: .normal)
+        offlineButton.isHidden = true
+        offlineButton.addTarget(self, action: #selector(goOffline), for: .touchUpInside)
+        view.addSubview(offlineButton)
+        offlineButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            offlineButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            offlineButton.topAnchor.constraint(equalTo: errorLabel.bottomAnchor, constant: 12),
+        ])
     }
 }
 
