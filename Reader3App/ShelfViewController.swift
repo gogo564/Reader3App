@@ -2,18 +2,31 @@ import UIKit
 
 class ShelfViewController: UIViewController {
     private var books: [Book] = []
+    private var filteredBooks: [Book] { offlineMode
+        ? books.filter { CacheManager.shared.cachedCount($0.bookUrl) > 0 }
+        : books
+    }
     private var collectionView: UICollectionView!
     private let refreshControl = UIRefreshControl()
     private var isEditingMode = false
+    private var offlineMode = false
+    private let networkBar = UIView()
+    private let networkLabel = UILabel()
+    private let networkDot = UIView()
+    private let pendingLabel = UILabel()
+    private var cacheManageVC: CacheManageViewController?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "书架"
         view.backgroundColor = UIColor(red: 0.98, green: 0.96, blue: 0.92, alpha: 1)
+        setupNetworkBar()
         setupCollectionView()
         setupNavigationBar()
+        updateNetworkBar()
         loadBooks()
         NotificationCenter.default.addObserver(self, selector: #selector(loadBooks), name: UIApplication.willEnterForegroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(networkChanged), name: .networkStatusChanged, object: nil)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -23,6 +36,69 @@ class ShelfViewController: UIViewController {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func networkChanged() {
+        DispatchQueue.main.async { self.updateNetworkBar() }
+    }
+
+    private func updateNetworkBar() {
+        let online = NetworkMonitor.shared.isConnected
+        networkDot.backgroundColor = online ? .systemGreen : .systemRed
+        networkDot.layer.cornerRadius = 4
+        networkDot.clipsToBounds = true
+        networkLabel.text = online ? "在线" : "离线"
+        networkLabel.textColor = online ? .darkText : .systemRed
+        let pending = SyncQueue.shared.pendingCount
+        pendingLabel.text = pending > 0 ? "待同步 \(pending)" : ""
+        pendingLabel.textColor = .systemOrange
+        networkBar.backgroundColor = online
+            ? UIColor(white: 1, alpha: 0.9)
+            : UIColor(red: 1, green: 0.95, blue: 0.95, alpha: 0.95)
+        if !online || pending > 0 {
+            networkBar.isHidden = false
+        } else {
+            networkBar.isHidden = true
+        }
+    }
+
+    private func setupNetworkBar() {
+        networkBar.isHidden = true
+        networkBar.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(networkBar)
+
+        networkDot.translatesAutoresizingMaskIntoConstraints = false
+        networkDot.layer.cornerRadius = 4
+        networkBar.addSubview(networkDot)
+
+        networkLabel.font = .systemFont(ofSize: 12)
+        networkLabel.translatesAutoresizingMaskIntoConstraints = false
+        networkBar.addSubview(networkLabel)
+
+        pendingLabel.font = .systemFont(ofSize: 11)
+        pendingLabel.translatesAutoresizingMaskIntoConstraints = false
+        networkBar.addSubview(pendingLabel)
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(showCacheManage))
+        networkBar.addGestureRecognizer(tap)
+
+        NSLayoutConstraint.activate([
+            networkBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            networkBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            networkBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            networkBar.heightAnchor.constraint(equalToConstant: 28),
+
+            networkDot.centerYAnchor.constraint(equalTo: networkBar.centerYAnchor),
+            networkDot.leadingAnchor.constraint(equalTo: networkBar.leadingAnchor, constant: 12),
+            networkDot.widthAnchor.constraint(equalToConstant: 8),
+            networkDot.heightAnchor.constraint(equalToConstant: 8),
+
+            networkLabel.centerYAnchor.constraint(equalTo: networkBar.centerYAnchor),
+            networkLabel.leadingAnchor.constraint(equalTo: networkDot.trailingAnchor, constant: 6),
+
+            pendingLabel.centerYAnchor.constraint(equalTo: networkBar.centerYAnchor),
+            pendingLabel.trailingAnchor.constraint(equalTo: networkBar.trailingAnchor, constant: -12),
+        ])
     }
 
     private func setupCollectionView() {
@@ -40,7 +116,7 @@ class ShelfViewController: UIViewController {
         view.addSubview(collectionView)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            collectionView.topAnchor.constraint(equalTo: networkBar.bottomAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -59,10 +135,28 @@ class ShelfViewController: UIViewController {
         if isEditingMode {
             navigationItem.rightBarButtonItem = UIBarButtonItem(title: "完成", style: .done, target: self, action: #selector(toggleEdit))
         } else {
+            let offlineBtn = UIBarButtonItem(
+                title: offlineMode ? "离线" : "在线",
+                style: .plain, target: self, action: #selector(toggleOffline)
+            )
             let editBtn = UIBarButtonItem(title: "编辑", style: .plain, target: self, action: #selector(toggleEdit))
-            let refreshBtn = UIBarButtonItem(title: "刷新", style: .plain, target: self, action: #selector(refreshBooks))
-            navigationItem.rightBarButtonItems = [refreshBtn, editBtn]
+            let cacheBtn = UIBarButtonItem(title: "缓存", style: .plain, target: self, action: #selector(showCacheManage))
+            navigationItem.rightBarButtonItems = [editBtn, cacheBtn, offlineBtn]
         }
+    }
+
+    @objc private func toggleOffline() {
+        offlineMode.toggle()
+        updateRightBarButton()
+        collectionView.reloadData()
+        updateNetworkBar()
+    }
+
+    @objc private func showCacheManage() {
+        let vc = CacheManageViewController(books: books, shelfVC: self)
+        cacheManageVC = vc
+        let nav = UINavigationController(rootViewController: vc)
+        present(nav, animated: true)
     }
 
     @objc private func toggleEdit() {
@@ -148,9 +242,13 @@ class ShelfViewController: UIViewController {
                 let books = try await NetworkService.shared.getBookshelf()
                 await MainActor.run {
                     self.books = books
+                    self.cacheManageVC?.updateBooks(books)
                     self.collectionView.reloadData()
+                    self.updateNetworkBar()
                 }
-            } catch {}
+            } catch {
+                await MainActor.run { self.updateNetworkBar() }
+            }
         }
     }
 
@@ -160,8 +258,10 @@ class ShelfViewController: UIViewController {
                 let books = try await NetworkService.shared.getBookshelf(refresh: true)
                 await MainActor.run {
                     self.books = books
+                    self.cacheManageVC?.updateBooks(books)
                     self.collectionView.reloadData()
                     self.refreshControl.endRefreshing()
+                    self.updateNetworkBar()
                 }
             } catch {
                 await MainActor.run { self.refreshControl.endRefreshing() }
@@ -339,12 +439,12 @@ class ShelfViewController: UIViewController {
 }
 
 extension ShelfViewController: UICollectionViewDataSource, UICollectionViewDelegate {
-    func collectionView(_: UICollectionView, numberOfItemsInSection _: Int) -> Int { books.count }
+    func collectionView(_: UICollectionView, numberOfItemsInSection _: Int) -> Int { filteredBooks.count }
 
     func collectionView(_ cv: UICollectionView, cellForItemAt ip: IndexPath) -> UICollectionViewCell {
         let cell = cv.dequeueReusableCell(withReuseIdentifier: "cell", for: ip) as! BookCell
-        let book = books[ip.item]
-        cell.configure(with: book, showDelete: isEditingMode)
+        let book = filteredBooks[ip.item]
+        cell.configure(with: book, showDelete: isEditingMode, offlineMode: offlineMode)
         cell.onDelete = { [weak self] in
             self?.deleteBook(book)
         }
@@ -356,7 +456,7 @@ extension ShelfViewController: UICollectionViewDataSource, UICollectionViewDeleg
 
     func collectionView(_: UICollectionView, didSelectItemAt ip: IndexPath) {
         guard !isEditingMode else { return }
-        openBook(books[ip.item])
+        openBook(filteredBooks[ip.item])
     }
 }
 
@@ -439,20 +539,26 @@ class BookCell: UICollectionViewCell {
     @objc private func didTapDelete() { onDelete?() }
     @objc private func didTapCache() { onCache?() }
 
-    func configure(with book: Book, showDelete: Bool = false) {
+    func configure(with book: Book, showDelete: Bool = false, offlineMode: Bool = false) {
         nameLabel.text = book.name
         authorLabel.text = book.author
         deleteButton.isHidden = !showDelete
+        let cached = CacheManager.shared.cachedCount(book.bookUrl)
+        if offlineMode && cached == 0 {
+            contentView.alpha = 0.4
+            cacheButton.isEnabled = false
+        } else {
+            contentView.alpha = 1
+        }
         if let t = book.durChapterTitle, let i = book.durChapterIndex {
             progressLabel.text = "已读至\(i+1)章\n\(t)"
         } else {
             progressLabel.text = "未阅读"
         }
-        let cached = CacheManager.shared.cachedCount(book.bookUrl)
         let total = CacheManager.shared.cachedTotal(book.bookUrl)
         if cached == 0 {
             cacheButton.setTitle("缓存", for: .normal)
-            cacheButton.isEnabled = true
+            cacheButton.isEnabled = !offlineMode
             cacheLabel.text = ""
         } else if total > 0 && cached >= total {
             cacheButton.setTitle("已缓存", for: .normal)
@@ -460,7 +566,7 @@ class BookCell: UICollectionViewCell {
             cacheLabel.text = "\(cached)章"
         } else {
             cacheButton.setTitle("继续缓存", for: .normal)
-            cacheButton.isEnabled = true
+            cacheButton.isEnabled = !offlineMode
             cacheLabel.text = "\(cached)/\(max(total, cached))章"
         }
         if let url = book.coverImageURL {

@@ -61,10 +61,14 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     }
     
     private func saveReadingProgress() {
-        guard NetworkMonitor.shared.isConnected else { return }
         guard let rm = readModel?.recordModel, let chapterID = rm.chapterModel?.id else { return }
-        Task {
-            try? await NetworkService.shared.saveBookProgress(bookUrl: readModel.bookID, index: chapterID.intValue)
+        let bookUrl = readModel.bookID
+        let index = chapterID.intValue
+        let payload = (try? JSONSerialization.data(withJSONObject: ["url": bookUrl, "index": index])) ?? Data()
+        if NetworkMonitor.shared.isConnected {
+            Task { try? await NetworkService.shared.saveBookProgress(bookUrl: bookUrl, index: index) }
+        } else {
+            SyncQueue.shared.enqueue(type: .saveProgress, bookUrl: bookUrl, payload: payload)
         }
     }
 

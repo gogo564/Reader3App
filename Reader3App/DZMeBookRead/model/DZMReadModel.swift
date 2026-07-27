@@ -74,7 +74,6 @@ class DZMReadModel: NSObject {
     }
 
     func syncUploadMark(_ mark: DZMReadMarkModel) {
-        guard NetworkMonitor.shared.isConnected else { return }
         let item = BookmarkItem(
             bookUrl: bookID ?? "",
             time: mark.time?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000),
@@ -86,11 +85,15 @@ class DZMReadModel: NSObject {
             bookText: "",
             content: mark.content ?? ""
         )
-        Task { try? await NetworkService.shared.saveBookmark(item) }
+        let payload = (try? JSONEncoder().encode(item)) ?? Data()
+        if NetworkMonitor.shared.isConnected {
+            Task { try? await NetworkService.shared.saveBookmark(item) }
+        } else {
+            SyncQueue.shared.enqueue(type: .saveBookmark, bookUrl: bookID ?? "", payload: payload)
+        }
     }
 
     func syncDeleteMark(_ mark: DZMReadMarkModel) {
-        guard NetworkMonitor.shared.isConnected else { return }
         let item = BookmarkItem(
             bookUrl: bookID ?? "",
             time: mark.time?.int64Value ?? 0,
@@ -102,7 +105,12 @@ class DZMReadModel: NSObject {
             bookText: "",
             content: mark.content ?? ""
         )
-        Task { try? await NetworkService.shared.deleteBookmark(item) }
+        let payload = (try? JSONEncoder().encode(item)) ?? Data()
+        if NetworkMonitor.shared.isConnected {
+            Task { try? await NetworkService.shared.deleteBookmark(item) }
+        } else {
+            SyncQueue.shared.enqueue(type: .deleteBookmark, bookUrl: bookID ?? "", payload: payload)
+        }
     }
 
     func modifyChapterList(chapterListModels: [DZMReadChapterListModel]) {
