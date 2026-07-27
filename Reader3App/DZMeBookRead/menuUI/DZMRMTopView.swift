@@ -61,6 +61,11 @@ class DZMRMTopView: DZMRMBaseView {
         
         updateMarkButton()
     }
+
+    func checkForMark(recordModel: DZMReadRecordModel?) {
+        mark.isSelected = (readMenu.vc.readModel.isExistMark(recordModel: recordModel) != nil)
+        updateMarkButton()
+    }
     
     /// 刷新书签按钮显示状态
     func updateMarkButton() {

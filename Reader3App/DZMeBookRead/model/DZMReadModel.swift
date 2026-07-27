@@ -37,12 +37,14 @@ class DZMReadModel: NSObject {
         mark.name = recordModel.chapterName
         mark.time = NSNumber(value: Timer1970())
         markModels.insert(mark, at: 0)
+        saveMarks()
     }
 
     func removeMark() -> Bool {
         guard let record = recordModel else { return false }
         if let index = markModels.firstIndex(where: { $0.chapterID == record.chapterModel.id && $0.location.intValue == record.locationFirst.intValue }) {
             markModels.remove(at: index)
+            saveMarks()
             return true
         }
         return false
@@ -58,9 +60,38 @@ class DZMReadModel: NSObject {
 
     func removeAllMark() {
         markModels.removeAll()
+        saveMarks()
     }
 
     func modifyChapterList(chapterListModels: [DZMReadChapterListModel]) {
         self.chapterListModels = chapterListModels
+    }
+
+    func saveMarks() {
+        let key = "bookmarks_\(bookID ?? "")"
+        let list = markModels.map { m in
+            ["bookID": m.bookID ?? "", "chapterID": m.chapterID?.intValue ?? 0,
+             "name": m.name ?? "", "content": m.content ?? "",
+             "time": m.time?.int64Value ?? 0, "location": m.location?.intValue ?? 0]
+        }
+        if let data = try? JSONSerialization.data(withJSONObject: list) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    func loadMarks() {
+        let key = "bookmarks_\(bookID ?? "")"
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return }
+        markModels = list.map { d in
+            let m = DZMReadMarkModel()
+            m.bookID = d["bookID"] as? String
+            m.chapterID = NSNumber(value: d["chapterID"] as? Int ?? 0)
+            m.name = d["name"] as? String
+            m.content = d["content"] as? String
+            m.time = NSNumber(value: d["time"] as? Int64 ?? 0)
+            m.location = NSNumber(value: d["location"] as? Int ?? 0)
+            return m
+        }
     }
 }

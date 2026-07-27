@@ -21,10 +21,12 @@ extension DZMReadModel {
         } else {
             markModels.insert(markModel, at: 0)
         }
+        saveMarks()
     }
 
     func removeMark(index: NSInteger) -> Bool {
         markModels.remove(at: index)
+        saveMarks()
         return true
     }
 

@@ -193,17 +193,56 @@ class ShelfViewController: UIViewController {
         present(alert, animated: true)
     }
 
+    private func cacheBook(_ book: Book) {
+        let alert = UIAlertController(title: "缓存中", message: "开始缓存...", preferredStyle: .alert)
+        present(alert, animated: true)
+        Task {
+            do {
+                let chapters = try await NetworkService.shared.getChapterList(bookUrl: book.bookUrl)
+                let total = chapters.count
+                for (i, _) in chapters.enumerated() {
+                    if CacheManager.shared.isChapterCached(bookUrl: book.bookUrl, index: i) { continue }
+                    let content = try await NetworkService.shared.getBookContent(bookUrl: book.bookUrl, index: i)
+                    CacheManager.shared.cacheChapter(bookUrl: book.bookUrl, index: i, content: content)
+                    await MainActor.run {
+                        alert.message = "缓存 \(i+1)/\(total) 章"
+                    }
+                }
+                await MainActor.run {
+                    alert.dismiss(animated: true)
+                    self.loadBooks()
+                }
+            } catch {
+                await MainActor.run {
+                    alert.dismiss(animated: true)
+                    let errAlert = UIAlertController(title: "缓存失败", message: error.localizedDescription, preferredStyle: .alert)
+                    errAlert.addAction(UIAlertAction(title: "确定", style: .default))
+                    self.present(errAlert, animated: true)
+                }
+            }
+        }
+    }
+
+    private func cachedContent(bookUrl: String, index: Int) -> String? {
+        if CacheManager.shared.isChapterCached(bookUrl: bookUrl, index: index) {
+            return CacheManager.shared.getCachedChapter(bookUrl: bookUrl, index: index)
+        }
+        return nil
+    }
+
     private func openBook(_ book: Book) {
         let readController = DZMReadController()
         let readModel = DZMReadModel()
         readModel.bookID = book.bookUrl
         readModel.bookName = book.name
+        readModel.loadMarks()
 
         readController.chapterList = { bookUrl in
             try await NetworkService.shared.getChapterList(bookUrl: bookUrl)
         }
-        readController.chapterContent = { bookUrl, index in
-            try await NetworkService.shared.getBookContent(bookUrl: bookUrl, index: index)
+        readController.chapterContent = { [weak self] bookUrl, index in
+            if let c = self?.cachedContent(bookUrl: bookUrl, index: index) { return c }
+            return try await NetworkService.shared.getBookContent(bookUrl: bookUrl, index: index)
         }
 
         Task {
@@ -258,9 +297,13 @@ extension ShelfViewController: UICollectionViewDataSource, UICollectionViewDeleg
 
     func collectionView(_ cv: UICollectionView, cellForItemAt ip: IndexPath) -> UICollectionViewCell {
         let cell = cv.dequeueReusableCell(withReuseIdentifier: "cell", for: ip) as! BookCell
-        cell.configure(with: books[ip.item], showDelete: isEditingMode)
+        let book = books[ip.item]
+        cell.configure(with: book, showDelete: isEditingMode)
         cell.onDelete = { [weak self] in
-            self?.deleteBook(self!.books[ip.item])
+            self?.deleteBook(book)
+        }
+        cell.onCache = { [weak self] in
+            self?.cacheBook(book)
         }
         return cell
     }
@@ -276,8 +319,11 @@ class BookCell: UICollectionViewCell {
     private let nameLabel = UILabel()
     private let authorLabel = UILabel()
     private let progressLabel = UILabel()
+    private let cacheButton = UIButton(type: .system)
+    private let cacheLabel = UILabel()
     private let deleteButton = UIButton(type: .system)
     var onDelete: (() -> Void)?
+    var onCache: (() -> Void)?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -298,7 +344,13 @@ class BookCell: UICollectionViewCell {
         progressLabel.textColor = UIColor(red: 0.58, green: 0.58, blue: 0.58, alpha: 1)
         progressLabel.textAlignment = .center
         progressLabel.numberOfLines = 2
-        [coverView, nameLabel, authorLabel, progressLabel, deleteButton].forEach {
+        cacheButton.setTitle("缓存", for: .normal)
+        cacheButton.titleLabel?.font = .systemFont(ofSize: 10)
+        cacheButton.addTarget(self, action: #selector(didTapCache), for: .touchUpInside)
+        cacheLabel.font = .systemFont(ofSize: 8)
+        cacheLabel.textColor = .gray
+        cacheLabel.textAlignment = .center
+        [coverView, nameLabel, authorLabel, progressLabel, cacheButton, cacheLabel, deleteButton].forEach {
             contentView.addSubview($0)
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
@@ -316,6 +368,10 @@ class BookCell: UICollectionViewCell {
             progressLabel.topAnchor.constraint(equalTo: authorLabel.bottomAnchor, constant: 1),
             progressLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
             progressLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
+            cacheButton.topAnchor.constraint(equalTo: progressLabel.bottomAnchor, constant: 2),
+            cacheButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            cacheLabel.topAnchor.constraint(equalTo: cacheButton.bottomAnchor, constant: 0),
+            cacheLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
         ])
         deleteButton.setTitle("✕", for: .normal)
         deleteButton.backgroundColor = UIColor(red: 1, green: 0.23, blue: 0.19, alpha: 1)
@@ -335,6 +391,7 @@ class BookCell: UICollectionViewCell {
     required init?(coder: NSCoder) { nil }
 
     @objc private func didTapDelete() { onDelete?() }
+    @objc private func didTapCache() { onCache?() }
 
     func configure(with book: Book, showDelete: Bool = false) {
         nameLabel.text = book.name
@@ -344,6 +401,16 @@ class BookCell: UICollectionViewCell {
             progressLabel.text = "已读至\(i+1)章\n\(t)"
         } else {
             progressLabel.text = "未阅读"
+        }
+        let cached = CacheManager.shared.cachedCount(book.bookUrl)
+        if cached > 0 {
+            cacheButton.setTitle("已缓存", for: .normal)
+            cacheButton.isEnabled = false
+            cacheLabel.text = "\(cached)章"
+        } else {
+            cacheButton.setTitle("缓存", for: .normal)
+            cacheButton.isEnabled = true
+            cacheLabel.text = ""
         }
         if let url = book.coverImageURL {
             URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
