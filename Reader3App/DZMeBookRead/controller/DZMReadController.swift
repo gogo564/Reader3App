@@ -64,9 +64,10 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         guard let rm = readModel?.recordModel, let chapterID = rm.chapterModel?.id else { return }
         let bookUrl = readModel.bookID ?? ""
         let index = chapterID.intValue
-        let payload = (try? JSONSerialization.data(withJSONObject: ["url": bookUrl, "index": index])) ?? Data()
+        let time = Date().timeIntervalSince1970 * 1000
+        let payload = (try? JSONSerialization.data(withJSONObject: ["url": bookUrl, "index": index, "time": time])) ?? Data()
         if NetworkMonitor.shared.isConnected {
-            Task { try? await NetworkService.shared.saveBookProgress(bookUrl: bookUrl, index: index) }
+            Task { try? await NetworkService.shared.saveBookProgress(bookUrl: bookUrl, index: index, time: time) }
         } else {
             SyncQueue.shared.enqueue(type: .saveProgress, bookUrl: bookUrl, payload: payload)
         }

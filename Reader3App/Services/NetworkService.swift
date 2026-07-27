@@ -123,8 +123,10 @@ class NetworkService {
         return content
     }
 
-    func saveBookProgress(bookUrl: String, index: Int) async throws {
-        let body = try JSONSerialization.data(withJSONObject: ["url": bookUrl, "index": index])
+    func saveBookProgress(bookUrl: String, index: Int, time: TimeInterval? = nil) async throws {
+        var dict: [String: Any] = ["url": bookUrl, "index": index]
+        if let t = time { dict["time"] = t }
+        let body = try JSONSerialization.data(withJSONObject: dict)
         _ = try await post("/saveBookProgress", body: body)
     }
 

@@ -42,9 +42,22 @@ class SyncQueue: NSObject {
         guard NetworkMonitor.shared.isConnected else { return }
         let ops = queue
         guard !ops.isEmpty else { return }
+
+        var serverBooks: [String: Book] = [:]
+        if let books = try? await NetworkService.shared.getBookshelf() {
+            for b in books { serverBooks[b.bookUrl] = b }
+        }
+
         var remaining = ops
         for op in ops {
             do {
+                if op.type == .saveProgress, let serverBook = serverBooks[op.bookUrl],
+                   let localDict = (try? JSONSerialization.jsonObject(with: op.payload)) as? [String: Any],
+                   let localTime = localDict["time"] as? TimeInterval,
+                   let serverTime = serverBook.durChapterTime, Double(serverTime) >= localTime {
+                    remaining.removeAll { $0.id == op.id }
+                    continue
+                }
                 try await execute(op)
                 remaining.removeAll { $0.id == op.id }
             } catch {
@@ -60,7 +73,8 @@ class SyncQueue: NSObject {
             guard let dict = try JSONSerialization.jsonObject(with: op.payload) as? [String: Any],
                   let url = dict["url"] as? String,
                   let index = dict["index"] as? Int else { return }
-            try await NetworkService.shared.saveBookProgress(bookUrl: url, index: index)
+            let time = dict["time"] as? TimeInterval
+            try await NetworkService.shared.saveBookProgress(bookUrl: url, index: index, time: time)
         case .saveBookmark:
             let item = try JSONDecoder().decode(BookmarkItem.self, from: op.payload)
             try await NetworkService.shared.saveBookmark(item)
