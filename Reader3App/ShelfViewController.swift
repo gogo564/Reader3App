@@ -137,7 +137,7 @@ class ShelfViewController: UIViewController {
         }
     }
 
-    private func loadBooks() {
+    @objc private func loadBooks() {
         Task {
             do {
                 let books = try await NetworkService.shared.getBookshelf()
