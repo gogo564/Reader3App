@@ -1,4 +1,4 @@
-import Foundation
+import UIKit
 
 class CacheManager {
     static let shared = CacheManager()
@@ -24,6 +24,18 @@ class CacheManager {
         return d
     }
 
+    private var metaDir: URL {
+        let d = cacheDir.appendingPathComponent("meta")
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+
+    private var coverDir: URL {
+        let d = cacheDir.appendingPathComponent("covers")
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+
     private func totalKey(_ bookUrl: String) -> String { "cache_total_\(bookUrl)" }
 
     func cacheChapters(bookUrl: String, chapters: [Chapter]) {
@@ -37,6 +49,30 @@ class CacheManager {
         let f = bookDir(bookUrl).appendingPathComponent("chapters.json")
         guard let data = try? Data(contentsOf: f) else { return nil }
         return try? JSONDecoder().decode([Chapter].self, from: data)
+    }
+
+    func cacheBookshelf(_ books: [Book]) {
+        let f = metaDir.appendingPathComponent("bookshelf.json")
+        if let data = try? JSONEncoder().encode(books) {
+            try? data.write(to: f)
+        }
+    }
+
+    func getCachedBookshelf() -> [Book]? {
+        let f = metaDir.appendingPathComponent("bookshelf.json")
+        guard let data = try? Data(contentsOf: f) else { return nil }
+        return try? JSONDecoder().decode([Book].self, from: data)
+    }
+
+    func cacheCover(bookUrl: String, imageData: Data) {
+        let f = coverDir.appendingPathComponent("\(stableKey(bookUrl)).jpg")
+        try? imageData.write(to: f)
+    }
+
+    func getCachedCover(bookUrl: String) -> UIImage? {
+        let f = coverDir.appendingPathComponent("\(stableKey(bookUrl)).jpg")
+        guard let data = try? Data(contentsOf: f) else { return nil }
+        return UIImage(data: data)
     }
 
     func cachedCount(_ bookUrl: String) -> Int {

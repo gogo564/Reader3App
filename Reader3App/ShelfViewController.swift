@@ -240,6 +240,7 @@ class ShelfViewController: UIViewController {
         Task {
             do {
                 let books = try await NetworkService.shared.getBookshelf()
+                CacheManager.shared.cacheBookshelf(books)
                 await MainActor.run {
                     self.books = books
                     self.cacheManageVC?.updateBooks(books)
@@ -247,6 +248,13 @@ class ShelfViewController: UIViewController {
                     self.updateNetworkBar()
                 }
             } catch {
+                if let cached = CacheManager.shared.getCachedBookshelf() {
+                    await MainActor.run {
+                        self.books = cached
+                        self.cacheManageVC?.updateBooks(cached)
+                        self.collectionView.reloadData()
+                    }
+                }
                 await MainActor.run { self.updateNetworkBar() }
             }
         }
@@ -256,6 +264,7 @@ class ShelfViewController: UIViewController {
         Task {
             do {
                 let books = try await NetworkService.shared.getBookshelf(refresh: true)
+                CacheManager.shared.cacheBookshelf(books)
                 await MainActor.run {
                     self.books = books
                     self.cacheManageVC?.updateBooks(books)
@@ -264,6 +273,13 @@ class ShelfViewController: UIViewController {
                     self.updateNetworkBar()
                 }
             } catch {
+                if let cached = CacheManager.shared.getCachedBookshelf() {
+                    await MainActor.run {
+                        self.books = cached
+                        self.cacheManageVC?.updateBooks(cached)
+                        self.collectionView.reloadData()
+                    }
+                }
                 await MainActor.run { self.refreshControl.endRefreshing() }
             }
         }
@@ -347,12 +363,18 @@ class ShelfViewController: UIViewController {
 
         readController.chapterList = { [weak self] bookUrl in
             if let cached = self?.chapterListCache(bookUrl: bookUrl) { return cached }
+            guard NetworkMonitor.shared.isConnected else {
+                throw NSError(domain: "Offline", code: -1, userInfo: nil)
+            }
             let chapters = try await NetworkService.shared.getChapterList(bookUrl: bookUrl)
             CacheManager.shared.cacheChapters(bookUrl: bookUrl, chapters: chapters)
             return chapters
         }
         readController.chapterContent = { [weak self] bookUrl, index in
             if let c = self?.cachedContent(bookUrl: bookUrl, index: index) { return c }
+            guard NetworkMonitor.shared.isConnected else {
+                throw NSError(domain: "Offline", code: -1, userInfo: nil)
+            }
             return try await NetworkService.shared.getBookContent(bookUrl: bookUrl, index: index)
         }
 
@@ -392,8 +414,40 @@ class ShelfViewController: UIViewController {
                     readController.readModel = readModel
                     navigationController?.pushViewController(readController, animated: true)
                 }
+
+                prefetchNextChapters(book: book, from: index + 1)
             } catch {
                 await MainActor.run {
+                    if let chapters = self.chapterListCache(bookUrl: book.bookUrl),
+                       let rawContent = self.cachedContent(bookUrl: book.bookUrl, index: book.durChapterIndex ?? 0) {
+                        let index = book.durChapterIndex ?? 0
+                        readController.catalogChapters = chapters
+                        for (i, ch) in chapters.enumerated() {
+                            let lm = DZMReadChapterListModel()
+                            lm.id = NSNumber(value: i)
+                            lm.name = ch.title
+                            lm.bookID = book.bookUrl
+                            readModel.chapterListModels.append(lm)
+                        }
+                        let cm = DZMReadChapterModel()
+                        cm.bookID = book.bookUrl
+                        cm.id = NSNumber(value: index)
+                        cm.name = book.durChapterTitle ?? chapters.first?.title ?? "开始阅读"
+                        cm.content = DZMReadParser.contentTypesetting(content: rawContent)
+                        cm.priority = NSNumber(value: index)
+                        if index > 0 { cm.previousChapterID = NSNumber(value: index - 1) }
+                        else { cm.previousChapterID = DZM_READ_NO_MORE_CHAPTER }
+                        if index < chapters.count - 1 { cm.nextChapterID = NSNumber(value: index + 1) }
+                        else { cm.nextChapterID = DZM_READ_NO_MORE_CHAPTER }
+                        cm.updateFont()
+                        let rm = DZMReadRecordModel()
+                        rm.bookID = book.bookUrl
+                        rm.chapterModel = cm
+                        readModel.recordModel = rm
+                        readController.readModel = readModel
+                        navigationController?.pushViewController(readController, animated: true)
+                        return
+                    }
                     if let cached = self.cachedContent(bookUrl: book.bookUrl, index: book.durChapterIndex ?? 0) {
                         readModel.chapterListModels = []
                         let lm = DZMReadChapterListModel()
@@ -428,6 +482,22 @@ class ShelfViewController: UIViewController {
                     alert.addAction(UIAlertAction(title: "确定", style: .default))
                     self.present(alert, animated: true)
                 }
+            }
+        }
+    }
+
+    private func prefetchNextChapters(book: Book, from index: Int) {
+        guard NetworkMonitor.shared.isConnected else { return }
+        guard let chapters = CacheManager.shared.getCachedChapters(bookUrl: book.bookUrl) else { return }
+        let end = min(index + 5, chapters.count)
+        guard index < end else { return }
+        Task {
+            for i in index..<end {
+                if CacheManager.shared.isChapterCached(bookUrl: book.bookUrl, index: i) { continue }
+                guard NetworkMonitor.shared.isConnected else { break }
+                if let c = try? await NetworkService.shared.getBookContent(bookUrl: book.bookUrl, index: i) {
+                    CacheManager.shared.cacheChapter(bookUrl: book.bookUrl, index: i, content: c)
+                } else { break }
             }
         }
     }
@@ -569,9 +639,14 @@ class BookCell: UICollectionViewCell {
             cacheButton.isEnabled = !offlineMode
             cacheLabel.text = "\(cached)/\(max(total, cached))章"
         }
-        if let url = book.coverImageURL {
+        if let cached = CacheManager.shared.getCachedCover(bookUrl: book.bookUrl) {
+            coverView.image = cached
+        } else if let url = book.coverImageURL {
             URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-                if let d = data { DispatchQueue.main.async { self?.coverView.image = UIImage(data: d) } }
+                if let d = data {
+                    CacheManager.shared.cacheCover(bookUrl: book.bookUrl, imageData: d)
+                    DispatchQueue.main.async { self?.coverView.image = UIImage(data: d) }
+                }
             }.resume()
         }
     }
