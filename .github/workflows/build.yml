@@ -25,11 +25,15 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
             archive 2>&1 | tee "$LOG"
           RC=${PIPESTATUS[0]}
-          echo "=== ERRORS ==="
-          grep -nE "(error:|fatal error:|FAILED|CompileSwift)" "$LOG" || echo "(none found)"
-          echo "=== LAST 10 LINES ==="
-          tail -10 "$LOG"
+          gzip "$LOG" && mv "$LOG.gz" /tmp/build_log.gz
           [ $RC -eq 0 ] || exit $RC
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-Log
+          path: /tmp/build_log.gz
 
       - name: Package IPA
         run: |
