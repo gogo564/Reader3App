@@ -38,14 +38,21 @@ class DZMReadChapterModel: NSObject {
         return title
     }
 
-    func contentString(page: NSInteger) -> String { pageModels[page].content.string }
-    func contentAttributedString(page: NSInteger) -> NSAttributedString { pageModels[page].showContent }
-    func locationFirst(page: NSInteger) -> NSNumber { NSNumber(value: pageModels[page].range.location) }
+    private subscript(page: NSInteger) -> DZMReadPageModel? {
+        guard !pageModels.isEmpty, page >= 0, page < pageModels.count else { return nil }
+        return pageModels[page]
+    }
+
+    func contentString(page: NSInteger) -> String { self[page]?.content.string ?? "" }
+    func contentAttributedString(page: NSInteger) -> NSAttributedString { self[page]?.showContent ?? NSAttributedString() }
+    func locationFirst(page: NSInteger) -> NSNumber { self[page].map { NSNumber(value: $0.range.location) } ?? NSNumber(value: 0) }
     func locationLast(page: NSInteger) -> NSNumber {
-        let r = pageModels[page].range!; return NSNumber(value: r.location + r.length)
+        guard let r = self[page]?.range else { return NSNumber(value: 0) }
+        return NSNumber(value: r.location + r.length)
     }
     func locationCenter(page: NSInteger) -> NSNumber {
-        let r = pageModels[page].range!; return NSNumber(value: (r.location + (r.location + r.length) / 2))
+        guard let r = self[page]?.range else { return NSNumber(value: 0) }
+        return NSNumber(value: (r.location + (r.location + r.length) / 2))
     }
     func page(location: NSInteger) -> NSNumber {
         for (i, m) in pageModels.enumerated() {

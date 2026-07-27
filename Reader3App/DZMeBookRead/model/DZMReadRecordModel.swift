@@ -8,11 +8,21 @@ class DZMReadRecordModel: NSObject {
     var isFirstPage: Bool! { page.intValue <= 0 }
     var isLastChapter: Bool! { chapterModel.isLastChapter }
     var isFirstChapter: Bool! { chapterModel.isFirstChapter }
-    var locationFirst: NSNumber! { chapterModel.locationFirst(page: page.intValue) }
-    var locationLast: NSNumber! { chapterModel.locationLast(page: page.intValue) }
-    var pageModel: DZMReadPageModel! { chapterModel.pageModels[page.intValue] }
-    var contentString: String! { chapterModel.contentString(page: page.intValue) }
-    var contentAttributedString: NSAttributedString! { chapterModel.contentAttributedString(page: page.intValue) }
+    private var safePage: Int { max(page.intValue, 0) }
+    private var safePageCount: Int { max(chapterModel.pageCount?.intValue ?? 0, 0) }
+    private var pageInBounds: Bool { page.intValue >= 0 && page.intValue < safePageCount }
+
+    var locationFirst: NSNumber! { pageInBounds ? chapterModel.locationFirst(page: safePage) : NSNumber(value: 0) }
+    var locationLast: NSNumber! { pageInBounds ? chapterModel.locationLast(page: safePage) : NSNumber(value: 0) }
+    var pageModel: DZMReadPageModel! {
+        guard pageInBounds else { return nil }
+        return chapterModel.pageModels[safePage]
+    }
+    var contentString: String! { pageInBounds ? chapterModel.contentString(page: safePage) : "" }
+    var contentAttributedString: NSAttributedString! {
+        guard pageInBounds else { return NSAttributedString() }
+        return chapterModel.contentAttributedString(page: safePage)
+    }
     var chapterName: String! { chapterModel.name }
     var chapterID: NSNumber! { chapterModel.id }
     var previousChapterID: NSNumber! { chapterModel.previousChapterID }

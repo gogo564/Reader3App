@@ -65,8 +65,10 @@ class DZMReadViewController: DZMViewController {
     /// 初始化阅读视图
     func initReadView() {
         
+        guard let pageModel = recordModel.pageModel else { return }
+        
         // 是否为书籍首页
-        if recordModel.pageModel.isHomePage {
+        if pageModel.isHomePage {
             
             topView.isHidden = true
             bottomView.isHidden = true

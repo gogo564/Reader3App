@@ -98,7 +98,11 @@ extension DZMReadController {
                     let newRecord = DZMReadRecordModel()
                     newRecord.bookID = bookID
                     newRecord.chapterModel = chapterModel
-                    newRecord.page = isLocation ? chapterModel.page(location: toPage) : NSNumber(value: toPage)
+                    if toPage == DZM_READ_LAST_PAGE {
+                        newRecord.page = NSNumber(value: max(chapterModel.pageCount.intValue - 1, 0))
+                    } else {
+                        newRecord.page = isLocation ? chapterModel.page(location: toPage) : NSNumber(value: toPage)
+                    }
                     self.updateReadRecord(recordModel: newRecord)
                     self.creatPageController(displayController: self.GetReadViewController(recordModel: newRecord))
                 }
