@@ -103,15 +103,7 @@ class DZMReadConfigure: NSObject {
     /// 背景颜色
     var bgColor:UIColor! {
         
-        if bgColorIndex.intValue == DZM_READ_BG_COLORS.firstIndex(of: DZM_COLOR_BG_0) { // 牛皮黄背景
-            
-            if let img = UIImage(named: "read_bg_0") { return UIColor(patternImage: img) }
-            return DZM_COLOR_BG_0
-            
-        }else{
-            
-            return DZM_READ_BG_COLORS[bgColorIndex.intValue]
-        }
+        return DZM_READ_BG_COLORS[bgColorIndex.intValue]
     }
     
     /// 字体颜色
@@ -298,7 +290,7 @@ class DZMReadConfigure: NSObject {
         // 背景
         if (bgColorIndex == nil) || (bgColorIndex.intValue >= DZM_READ_BG_COLORS.count) {
             
-            bgColorIndex = NSNumber(value: DZM_READ_BG_COLORS.index(of: DZM_COLOR_BG_0) ?? 0)
+            bgColorIndex = NSNumber(value: 0)
         }
         
         // 字体类型

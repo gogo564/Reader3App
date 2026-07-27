@@ -13,6 +13,11 @@ class ShelfViewController: UIViewController {
         setupCollectionView()
         setupNavigationBar()
         loadBooks()
+        NotificationCenter.default.addObserver(self, selector: #selector(loadBooks), name: UIApplication.willEnterForegroundNotification, object: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func setupCollectionView() {

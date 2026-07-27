@@ -26,7 +26,7 @@ class DZMReadChapterModel: NSObject {
         if !NSDictionary(dictionary: attributes).isEqual(to: temp) {
             attributes = temp
             fullContent = fullContentAttrString()
-            pageModels = DZMReadParser.pageing(attrString: fullContent, rect: CGRect(origin: .zero, size: DZM_READ_VIEW_RECT.size), isFirstChapter: isFirstChapter)
+            pageModels = DZMReadParser.pageing(attrString: fullContent, rect: CGRect(origin: .zero, size: DZM_READ_VIEW_RECT.size))
             pageCount = NSNumber(value: pageModels.count)
         }
     }
