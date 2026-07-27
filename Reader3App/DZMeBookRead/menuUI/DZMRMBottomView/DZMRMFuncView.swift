@@ -62,9 +62,6 @@ class DZMRMFuncView: DZMRMBaseView {
         
         button.isSelected = !button.isSelected
         
-        // 切换日夜间
-        readMenu.cover.alpha = CGFloat(NSNumber(value: button.isSelected).floatValue)
-        
         // 刷新显示
         updateDNButton()
         

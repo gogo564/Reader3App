@@ -290,7 +290,7 @@ class DZMReadConfigure: NSObject {
         // 背景
         if (bgColorIndex == nil) || (bgColorIndex.intValue >= DZM_READ_BG_COLORS.count) {
             
-            bgColorIndex = NSNumber(value: 0)
+            bgColorIndex = NSNumber(value: 1)
         }
         
         // 字体类型

@@ -201,9 +201,16 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     
     /// 点击日夜间
     func readMenuClickDayAndNight(readMenu:DZMReadMenu!) {
-        
-        // 日夜间可以根据需求判断修改目录背景颜色,文字颜色等等(目前放在showLeftView方法中,leftView将要出现的时候处理)
-        // leftView.updateUI()
+        let isNight = DZMUserDefaults.bool(DZM_READ_KEY_MODE_DAY_NIGHT)
+        let config = DZMReadConfigure.shared()
+        if isNight {
+            config.bgColorIndex = NSNumber(value: 4)
+        } else {
+            config.bgColorIndex = NSNumber(value: 1)
+        }
+        config.save()
+        view.backgroundColor = config.bgColor
+        creatPageController(displayController: GetCurrentReadViewController())
     }
     
     /// 点击上一章
