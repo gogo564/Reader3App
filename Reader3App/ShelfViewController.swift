@@ -16,6 +16,11 @@ class ShelfViewController: UIViewController {
         NotificationCenter.default.addObserver(self, selector: #selector(loadBooks), name: UIApplication.willEnterForegroundNotification, object: nil)
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        loadBooks()
+    }
+
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
