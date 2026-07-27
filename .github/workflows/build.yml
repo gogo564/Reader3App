@@ -19,11 +19,17 @@ jobs:
 
       - name: Archive (unsigned)
         run: |
-          set -o pipefail
+          LOG=$(mktemp)
           xcodebuild -project Reader3App.xcodeproj -scheme Reader3App -destination generic/platform=iOS \
             -archivePath /tmp/Reader3App.xcarchive \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
-            archive 2>&1 | tail -200
+            archive 2>&1 | tee "$LOG"
+          RC=${PIPESTATUS[0]}
+          echo "=== ERRORS ==="
+          grep -nE "(error:|fatal error:|FAILED|CompileSwift)" "$LOG" || echo "(none found)"
+          echo "=== LAST 10 LINES ==="
+          tail -10 "$LOG"
+          [ $RC -eq 0 ] || exit $RC
 
       - name: Package IPA
         run: |
