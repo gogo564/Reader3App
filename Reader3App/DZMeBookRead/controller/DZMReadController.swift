@@ -56,6 +56,15 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         super.viewWillDisappear(animated)
         
         UIApplication.shared.setStatusBarStyle(.default, animated: true)
+        
+        saveReadingProgress()
+    }
+    
+    private func saveReadingProgress() {
+        guard let rm = readModel?.recordModel, let chapterID = rm.chapterModel?.id else { return }
+        Task {
+            try? await NetworkService.shared.saveBookProgress(bookUrl: readModel.bookID, index: chapterID.intValue)
+        }
     }
 
     override func addSubviews() {
