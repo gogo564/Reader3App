@@ -135,10 +135,11 @@ class NetworkService {
                 if let author = book.author, !author.isEmpty, r.author != author { continue }
                 return Book(bookUrl: r.bookUrl, name: r.name, author: r.author,
                             coverUrl: r.coverUrl, origin: r.origin, originName: r.originName,
-                            intro: r.intro, latestChapterTitle: r.latestChapterTitle,
+                            intro: r.intro,
                             durChapterTitle: book.durChapterTitle,
                             durChapterIndex: book.durChapterIndex,
                             durChapterTime: book.durChapterTime,
+                            latestChapterTitle: r.latestChapterTitle,
                             type: r.type, tocUrl: r.tocUrl)
             }
         }
