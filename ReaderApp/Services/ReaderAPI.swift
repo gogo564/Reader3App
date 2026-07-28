@@ -33,29 +33,35 @@ class ReaderAPI {
         ServerManager.shared.baseURL
     }
 
-    private var headers: [String: String] {
-        var h = ["Content-Type": "application/json"]
-        let mgr = ServerManager.shared
-        if !mgr.username.isEmpty {
-            let login = "\(mgr.username):\(mgr.password)"
-            if let data = login.data(using: .utf8) {
-                h["Authorization"] = "Basic \(data.base64EncodedString())"
-            }
-        }
-        return h
-    }
-
     private let apiPrefix = "/reader3"
+
+    private var session: URLSession {
+        let config = URLSessionConfiguration.default
+        config.httpCookieStorage = HTTPCookieStorage.shared
+        config.httpShouldSetCookies = true
+        return URLSession(configuration: config)
+    }
 
     private func decode<T: Codable>(_ data: Data) throws -> T {
         let response = try JSONDecoder().decode(APIResponse<T>.self, from: data)
         guard response.isSuccess else {
+            if response.errorMsg == "请登录后使用" || response.errorMsg == "NEED_LOGIN" {
+                awaitLogout()
+                throw APIError.notLoggedIn
+            }
             throw APIError.apiError(response.errorMsg ?? "请求失败")
         }
         guard let result = response.data else {
             throw APIError.decodeError
         }
         return result
+    }
+
+    private func awaitLogout() {
+        DispatchQueue.main.async {
+            ServerManager.shared.isLoggedIn = false
+            ServerManager.shared.isConnected = false
+        }
     }
 
     // MARK: - Bookshelf
@@ -95,10 +101,16 @@ class ReaderAPI {
             throw APIError.invalidURL
         }
         var req = URLRequest(url: url, timeoutInterval: 30)
-        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        guard let httpResp = resp as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) else {
-            throw APIError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0)
+        let (data, resp) = try await session.data(for: req)
+        guard let httpResp = resp as? HTTPURLResponse else {
+            throw APIError.serverError(0)
+        }
+        if httpResp.statusCode == 401 {
+            awaitLogout()
+            throw APIError.notLoggedIn
+        }
+        guard (200...299).contains(httpResp.statusCode) else {
+            throw APIError.serverError(httpResp.statusCode)
         }
         let chapters: [Chapter] = try decode(data)
         return chapters
@@ -111,10 +123,16 @@ class ReaderAPI {
             throw APIError.invalidURL
         }
         var req = URLRequest(url: url, timeoutInterval: 30)
-        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        guard let httpResp = resp as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) else {
-            throw APIError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0)
+        let (data, resp) = try await session.data(for: req)
+        guard let httpResp = resp as? HTTPURLResponse else {
+            throw APIError.serverError(0)
+        }
+        if httpResp.statusCode == 401 {
+            awaitLogout()
+            throw APIError.notLoggedIn
+        }
+        guard (200...299).contains(httpResp.statusCode) else {
+            throw APIError.serverError(httpResp.statusCode)
         }
         let response = try JSONDecoder().decode(APIResponse<String>.self, from: data)
         guard response.isSuccess, let content = response.data else {
@@ -129,10 +147,16 @@ class ReaderAPI {
             throw APIError.invalidURL
         }
         var req = URLRequest(url: url, timeoutInterval: 30)
-        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        guard let httpResp = resp as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) else {
-            throw APIError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0)
+        let (data, resp) = try await session.data(for: req)
+        guard let httpResp = resp as? HTTPURLResponse else {
+            throw APIError.serverError(0)
+        }
+        if httpResp.statusCode == 401 {
+            awaitLogout()
+            throw APIError.notLoggedIn
+        }
+        guard (200...299).contains(httpResp.statusCode) else {
+            throw APIError.serverError(httpResp.statusCode)
         }
         return data
     }
@@ -144,10 +168,17 @@ class ReaderAPI {
         var req = URLRequest(url: url, timeoutInterval: 30)
         req.httpMethod = "POST"
         req.httpBody = body
-        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        guard let httpResp = resp as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) else {
-            throw APIError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0)
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (data, resp) = try await session.data(for: req)
+        guard let httpResp = resp as? HTTPURLResponse else {
+            throw APIError.serverError(0)
+        }
+        if httpResp.statusCode == 401 {
+            awaitLogout()
+            throw APIError.notLoggedIn
+        }
+        guard (200...299).contains(httpResp.statusCode) else {
+            throw APIError.serverError(httpResp.statusCode)
         }
         return data
     }

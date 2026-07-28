@@ -3,12 +3,13 @@ import SwiftUI
 struct SetupView: View {
     @EnvironmentObject var serverManager: ServerManager
     @State private var serverAddress = ""
-    @State private var useAuth = false
     @State private var username = ""
     @State private var password = ""
-    @State private var isTesting = false
+    @State private var isLoggingIn = false
     @State private var showError = false
     @State private var errorMsg = ""
+    @State private var showRegister = false
+    @State private var registerMsg = ""
 
     var body: some View {
         NavigationView {
@@ -29,34 +30,52 @@ struct SetupView: View {
                 }
 
                 Section {
-                    Toggle("需要登录", isOn: $useAuth)
-                    if useAuth {
-                        TextField("用户名", text: $username)
-                            .autocapitalization(.none)
-                        SecureField("密码", text: $password)
-                    }
-                } header: {
-                    Text("身份验证（可选）")
-                }
-
-                Section {
-                    Button(action: testConnection) {
+                    TextField("用户名", text: $username)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                    SecureField("密码", text: $password)
+                    Button(action: login) {
                         HStack {
                             Spacer()
-                            if isTesting {
+                            if isLoggingIn {
                                 ProgressView()
                             } else {
-                                Text("连接服务器")
+                                Text("登 录")
                                     .fontWeight(.semibold)
                             }
                             Spacer()
                         }
                     }
-                    .disabled(serverAddress.isEmpty || isTesting)
+                    .disabled(serverAddress.isEmpty || username.isEmpty || password.isEmpty || isLoggingIn)
+                } header: {
+                    Text("登录")
+                }
+
+                Section {
+                    Button(action: register) {
+                        HStack {
+                            Spacer()
+                            if isLoggingIn {
+                                ProgressView()
+                            } else {
+                                Text("注册新账号")
+                                    .fontWeight(.semibold)
+                            }
+                            Spacer()
+                        }
+                    }
+                    .disabled(serverAddress.isEmpty || username.isEmpty || password.isEmpty || isLoggingIn)
+                    if !registerMsg.isEmpty {
+                        Text(registerMsg)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                } header: {
+                    Text("没有账号？")
                 }
             }
-            .navigationTitle("设置")
-            .alert("连接失败", isPresented: $showError) {
+            .navigationTitle("阅读 3")
+            .alert("登录失败", isPresented: $showError) {
                 Button("确定", role: .cancel) {}
             } message: {
                 Text(errorMsg)
@@ -64,33 +83,68 @@ struct SetupView: View {
         }
     }
 
-    private func testConnection() {
+    private func doLogin(isRegister: Bool) async throws {
         guard !serverAddress.isEmpty else { return }
-        isTesting = true
         var addr = serverAddress.trimmingCharacters(in: .whitespacesAndNewlines)
         if !addr.hasPrefix("http://") && !addr.hasPrefix("https://") {
             addr = "http://" + addr
         }
         serverManager.serverURL = addr
-        serverManager.username = useAuth ? username : ""
-        serverManager.password = useAuth ? password : ""
-        serverManager.testConnection()
+        try await serverManager.login(username: username, password: password)
+    }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak serverManager] in
-            guard let mgr = serverManager else { return }
-            isTesting = false
-            if !mgr.isConnected {
-                errorMsg = mgr.connectionError?.localizedDescription ?? "无法连接到服务器，请检查地址和网络"
-                showError = true
+    private func login() {
+        isLoggingIn = true
+        registerMsg = ""
+        Task {
+            do {
+                try await doLogin(isRegister: false)
+                await MainActor.run { isLoggingIn = false }
+            } catch {
+                await MainActor.run {
+                    errorMsg = error.localizedDescription
+                    showError = true
+                    isLoggingIn = false
+                }
             }
         }
     }
-}
 
-extension View {
-    func placeholder<Content: View>(when shouldShow: Bool, @ViewBuilder content: () -> Content) -> some View {
-        overlay(alignment: .leading) {
-            if shouldShow { content() }
+    private func register() {
+        isLoggingIn = true
+        registerMsg = ""
+        Task {
+            do {
+                var addr = serverAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !addr.hasPrefix("http://") && !addr.hasPrefix("https://") {
+                    addr = "http://" + addr
+                }
+                let trimmed = addr.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                guard let url = URL(string: "\(trimmed)/reader3/login") else {
+                    throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "无效的地址"])
+                }
+                var req = URLRequest(url: url, timeoutInterval: 15)
+                req.httpMethod = "POST"
+                req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                let body = ["username": username, "password": password, "isLogin": false]
+                req.httpBody = try JSONSerialization.data(withJSONObject: body)
+                let (data, _) = try await URLSession.shared.data(for: req)
+                struct RegResponse: Codable { let isSuccess: Bool; let errorMsg: String? }
+                let resp = try JSONDecoder().decode(RegResponse.self, from: data)
+                await MainActor.run {
+                    isLoggingIn = false
+                    if resp.isSuccess {
+                        registerMsg = "注册成功！请登录"
+                    } else {
+                        registerMsg = resp.errorMsg ?? "注册失败"
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    registerMsg = "注册失败: \(error.localizedDescription)"
+                    isLoggingIn = false
+                }
+            }
         }
     }
 }

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var serverManager: ServerManager
-    @State private var showResetAlert = false
+    @State private var showLogoutAlert = false
 
     var body: some View {
         NavigationView {
@@ -18,10 +18,16 @@ struct SettingsView: View {
                         }
                     }
                     HStack {
+                        Text("用户")
+                        Spacer()
+                        Text(serverManager.username)
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
                         Text("状态")
                         Spacer()
                         if serverManager.isConnected {
-                            Label("已连接", systemImage: "checkmark.circle.fill")
+                            Label("已登录", systemImage: "checkmark.circle.fill")
                                 .foregroundColor(.green)
                         } else {
                             Label("未连接", systemImage: "xmark.circle.fill")
@@ -33,14 +39,10 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Button(action: { serverManager.testConnection() }) {
-                        Label("重新连接", systemImage: "arrow.clockwise")
-                    }
-
                     Button(role: .destructive) {
-                        showResetAlert = true
+                        showLogoutAlert = true
                     } label: {
-                        Label("重置设置", systemImage: "trash")
+                        Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                 }
 
@@ -55,11 +57,11 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("设置")
-            .alert("确认重置", isPresented: $showResetAlert) {
+            .alert("退出登录", isPresented: $showLogoutAlert) {
                 Button("取消", role: .cancel) {}
-                Button("重置", role: .destructive) { serverManager.reset() }
+                Button("退出", role: .destructive) { serverManager.reset() }
             } message: {
-                Text("重置后需要重新输入服务器地址")
+                Text("退出后需要重新输入服务器地址和密码")
             }
         }
     }
