@@ -59,11 +59,19 @@ class NetworkService {
     }
 
     // MARK: - Search
-    func searchBook(key: String, bookSourceUrl: String = "", page: Int = 1) async throws -> [SearchResult] {
+    func searchBook(key: String, searchType: String, bookSourceUrl: String = "",
+                    bookSourceGroup: String = "", concurrentCount: Int = 24,
+                    page: Int = 1, lastIndex: Int = -1) async throws -> [SearchResult] {
         let body = try JSONSerialization.data(withJSONObject: [
-            "key": key, "bookSourceUrl": bookSourceUrl, "page": page
+            "key": key,
+            "bookSourceUrl": bookSourceUrl,
+            "bookSourceGroup": bookSourceGroup,
+            "concurrentCount": concurrentCount,
+            "lastIndex": lastIndex,
+            "page": page
         ] as [String: Any])
-        let data = try await post("/searchBook", body: body)
+        let path = searchType == "single" ? "/searchBook" : "/searchBookMulti"
+        let data = try await post(path, body: body, timeout: searchType == "single" ? 30 : 180)
         let resp = try JSONDecoder().decode(APIResponse<SearchMultiResponse>.self, from: data)
         guard resp.isSuccess, let result = resp.data else {
             throw APIError.apiError(resp.errorMsg ?? "搜索失败")
