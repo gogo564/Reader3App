@@ -127,7 +127,13 @@ class CacheManager {
 
     func clearCache(bookUrl: String) {
         let d = bookDir(bookUrl)
-        try? FileManager.default.removeItem(at: d)
+        if FileManager.default.fileExists(atPath: d.path) {
+            do {
+                try FileManager.default.removeItem(at: d)
+            } catch {
+                print("[CacheManager] clearCache failed: \(error)")
+            }
+        }
         UserDefaults.standard.removeObject(forKey: totalKey(bookUrl))
     }
 }
