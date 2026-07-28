@@ -23,6 +23,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     var currentDisplayController: DZMReadViewController?
     var tempNumber: NSInteger = 1
     var catalogChapters: [Chapter] = []
+    var bookAuthor: String?
     
     override func viewDidLoad() {
         
@@ -359,8 +360,125 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         
         creatPageController(displayController: GetCurrentReadViewController())
     }
-    
-    
+
+    /// 点击换源
+    func readMenuClickSwitchSource(readMenu: DZMReadMenu!) {
+        readMenu.showMenu(isShow: false)
+        Task {
+            guard let sources = try? await NetworkService.shared.getBookSources(simple: true) else {
+                await MainActor.run { self.toast("获取书源失败") }
+                return
+            }
+            let alert = UIAlertController(title: "选择书源", message: nil, preferredStyle: .actionSheet)
+            for src in sources {
+                guard let name = src.bookSourceName, !name.isEmpty else { continue }
+                alert.addAction(UIAlertAction(title: name, style: .default) { [weak self] _ in
+                    self?.switchToSource(src)
+                })
+            }
+            alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+            if let popover = alert.popoverPresentationController {
+                popover.sourceView = readMenu.bottomView
+                popover.sourceRect = readMenu.bottomView.bounds
+            }
+            await MainActor.run { present(alert, animated: true) }
+        }
+    }
+
+    private func switchToSource(_ source: BookSource) {
+        guard let srcUrl = source.bookSourceUrl, !srcUrl.isEmpty else {
+            toast("该书源无效")
+            return
+        }
+        let bookName = readModel.bookName ?? ""
+        let author = bookAuthor
+        toast("正在搜索...")
+        Task {
+            do {
+                let results = try await NetworkService.shared.searchOnSource(bookName: bookName, sourceUrl: srcUrl)
+                var match: SearchResult?
+                for r in results {
+                    guard r.name == bookName else { continue }
+                    if let a = author, !a.isEmpty, r.author != a { continue }
+                    match = r
+                    break
+                }
+                if match == nil {
+                    await MainActor.run { self.toast("未在本书源找到「\(bookName)」") }
+                    return
+                }
+                guard let m = match else {
+                    await MainActor.run { self.toast("该书源不可用") }
+                    return
+                }
+                let newUrl = m.bookUrl
+                guard !newUrl.isEmpty else {
+                    await MainActor.run { self.toast("该书源不可用") }
+                    return
+                }
+                let chapters = try await chapterList!(newUrl)
+                catalogChapters = chapters
+                let index = readModel.recordModel.chapterModel.id?.intValue ?? 0
+                let safeIndex = index < chapters.count ? index : 0
+                let rawContent = try await chapterContent!(newUrl, safeIndex)
+                let content = DZMReadParser.contentTypesetting(content: rawContent)
+                readModel.bookID = newUrl
+                readModel.chapterListModels.removeAll()
+                for (i, ch) in chapters.enumerated() {
+                    let lm = DZMReadChapterListModel()
+                    lm.id = NSNumber(value: i)
+                    lm.name = ch.title
+                    lm.bookID = newUrl
+                    readModel.chapterListModels.append(lm)
+                }
+                let cm = DZMReadChapterModel()
+                cm.bookID = newUrl
+                cm.id = NSNumber(value: safeIndex)
+                cm.name = chapters[safe: safeIndex]?.title ?? "开始阅读"
+                cm.content = content
+                cm.priority = NSNumber(value: safeIndex)
+                if safeIndex > 0 { cm.previousChapterID = NSNumber(value: safeIndex - 1) }
+                else { cm.previousChapterID = DZM_READ_NO_MORE_CHAPTER }
+                if safeIndex < chapters.count - 1 { cm.nextChapterID = NSNumber(value: safeIndex + 1) }
+                else { cm.nextChapterID = DZM_READ_NO_MORE_CHAPTER }
+                cm.updateFont()
+                let rm = DZMReadRecordModel()
+                rm.bookID = newUrl
+                rm.chapterModel = cm
+                readModel.recordModel = rm
+                await MainActor.run {
+                    readMenu.topView.updateMarkButton()
+                    readMenu.bottomView.progressView.reloadProgress()
+                    creatPageController(displayController: GetCurrentReadViewController())
+                    toast("已切换到「\(source.bookSourceName ?? "新源")」")
+                }
+            } catch {
+                await MainActor.run { self.toast("换源失败: \(error.localizedDescription)") }
+            }
+        }
+    }
+
+    private func toast(_ msg: String) {
+        let lbl = UILabel()
+        lbl.text = msg
+        lbl.textColor = .white
+        lbl.backgroundColor = UIColor.black.withAlphaComponent(0.75)
+        lbl.textAlignment = .center
+        lbl.font = .systemFont(ofSize: 15)
+        lbl.sizeToFit()
+        lbl.frame.size.width += 32
+        lbl.frame.size.height += 16
+        lbl.layer.cornerRadius = 8
+        lbl.clipsToBounds = true
+        lbl.center = CGPoint(x: view.center.x, y: view.center.y - 80)
+        lbl.alpha = 0
+        view.addSubview(lbl)
+        UIView.animate(withDuration: 0.25) { lbl.alpha = 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            UIView.animate(withDuration: 0.25) { lbl.alpha = 0 } completion: { _ in lbl.removeFromSuperview() }
+        }
+    }
+
     // MARK: 展示动画
     
     /// 辅视图展示

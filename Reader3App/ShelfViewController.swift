@@ -322,6 +322,7 @@ class ShelfViewController: UIViewController {
 
     private func openBook(_ book: Book) {
         let readController = DZMReadController()
+        readController.bookAuthor = book.author
         let readModel = DZMReadModel()
         readModel.bookID = book.bookUrl
         readModel.bookName = book.name

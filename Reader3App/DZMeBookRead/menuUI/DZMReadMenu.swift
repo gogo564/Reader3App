@@ -63,6 +63,9 @@ import UIKit
     
     /// 点击切换翻页效果
     @objc optional func readMenuClickEffect(readMenu:DZMReadMenu)
+
+    /// 点击换源
+    @objc optional func readMenuClickSwitchSource(readMenu:DZMReadMenu!)
 }
 
 class DZMReadMenu: NSObject,UIGestureRecognizerDelegate {
