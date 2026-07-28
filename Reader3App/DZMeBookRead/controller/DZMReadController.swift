@@ -28,9 +28,6 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         
         super.viewDidLoad()
         
-        // 保存进入阅读器前的系统亮度，退出时恢复
-        DZMUserDefaults.setFloat(Float(UIScreen.main.brightness), DZM_READ_KEY_SAVED_BRIGHTNESS)
-        
         // 初始化书籍阅读记录
         updateReadRecord(recordModel: readModel.recordModel)
         
@@ -70,10 +67,6 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         
         UIApplication.shared.setStatusBarStyle(.default, animated: true)
 
-        // 恢复进入阅读器前的系统亮度
-        let saved = DZMUserDefaults.float(DZM_READ_KEY_SAVED_BRIGHTNESS)
-        if saved >= 0 { UIScreen.main.brightness = CGFloat(saved) }
-        
         autoSaveTimer?.invalidate()
         autoSaveTimer = nil
         
@@ -258,6 +251,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         }
         config.save()
         view.backgroundColor = config.bgColor
+        readMenu.cover.alpha = isNight ? 1.0 : 0.0
         creatPageController(displayController: GetCurrentReadViewController())
     }
     

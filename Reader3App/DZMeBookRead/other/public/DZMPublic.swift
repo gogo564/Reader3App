@@ -281,8 +281,6 @@ let DZM_READ_KEY_OBJECT:String = "DZM_READ_OBJECT"
 /// Key - 日夜间模式 NO:日间 YES:夜间
 let DZM_READ_KEY_MODE_DAY_NIGHT:String = "DZM_READ_MODE_DAY_NIGHT"
 
-/// Key - 进入阅读器时保存的系统亮度
-let DZM_READ_KEY_SAVED_BRIGHTNESS:String = "DZM_READ_SAVED_BRIGHTNESS"
 
 /// 沙河路径
 let DZM_READ_DOCUMENT_DIRECTORY_PATH:String = (NSSearchPathForDirectoriesInDomains(FileManager.SearchPathDirectory.documentDirectory, FileManager.SearchPathDomainMask.userDomainMask, true).last! as String)
