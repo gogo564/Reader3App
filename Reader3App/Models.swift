@@ -206,6 +206,18 @@ struct BookSource: Codable, Identifiable {
     let enabled: Bool?
     let weight: Int?
     let exploreUrl: String?
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        bookSourceUrl = try c.decodeIfPresent(String.self, forKey: .bookSourceUrl)
+        bookSourceName = try c.decodeIfPresent(String.self, forKey: .bookSourceName)
+        bookSourceGroup = try c.decodeIfPresent(String.self, forKey: .bookSourceGroup)
+        bookSourceType = try c.decodeIfPresent(Int.self, forKey: .bookSourceType)
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled)
+        weight = try c.decodeIfPresent(Int.self, forKey: .weight)
+        if let s = try? c.decodeIfPresent(String.self, forKey: .exploreUrl) { exploreUrl = s }
+        else if let b = try? c.decodeIfPresent(Bool.self, forKey: .exploreUrl) { exploreUrl = b ? "true" : "false" }
+        else { exploreUrl = nil }
+    }
 }
 
 struct ReplaceRule: Codable, Identifiable {

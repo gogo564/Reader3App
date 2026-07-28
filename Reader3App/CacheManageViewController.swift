@@ -2,14 +2,7 @@ import UIKit
 
 class CacheManagerCell: UITableViewCell {
     let statusLabel = UILabel()
-    let progressView: UIProgressView = {
-        let p = UIProgressView(progressViewStyle: .bar)
-        p.trackTintColor = UIColor.systemGray5
-        p.progressTintColor = UIColor.systemBlue
-        p.layer.cornerRadius = 4
-        p.clipsToBounds = true
-        return p
-    }()
+    let progressView = UIProgressView(progressViewStyle: .bar)
     let pauseBtn: UIButton = {
         let b = UIButton(type: .system)
         b.setImage(UIImage(systemName: "pause.fill"), for: .normal)
@@ -24,38 +17,36 @@ class CacheManagerCell: UITableViewCell {
     }()
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
-        super.init(style: .default, reuseIdentifier: reuseIdentifier)
+        super.init(style: .subtitle, reuseIdentifier: reuseIdentifier)
         statusLabel.font = .systemFont(ofSize: 12)
         statusLabel.textColor = .secondaryLabel
+        progressView.trackTintColor = UIColor.systemGray5
+        progressView.progressTintColor = UIColor.systemBlue
+        progressView.layer.cornerRadius = 4
+        progressView.clipsToBounds = true
         contentView.addSubview(statusLabel)
         contentView.addSubview(progressView)
         contentView.addSubview(pauseBtn)
         contentView.addSubview(deleteBtn)
-        statusLabel.translatesAutoresizingMaskIntoConstraints = false
-        progressView.translatesAutoresizingMaskIntoConstraints = false
-        pauseBtn.translatesAutoresizingMaskIntoConstraints = false
-        deleteBtn.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            statusLabel.topAnchor.constraint(equalTo: textLabel!.bottomAnchor, constant: 2),
-            statusLabel.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
-            statusLabel.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor, constant: -90),
+    }
 
-            progressView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 4),
-            progressView.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
-            progressView.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor, constant: -90),
-            progressView.heightAnchor.constraint(equalToConstant: 6),
-            progressView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let left = contentView.layoutMargins.left
+        let right = contentView.frame.width - contentView.layoutMargins.right
+        let btnArea: CGFloat = 80
 
-            pauseBtn.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            pauseBtn.trailingAnchor.constraint(equalTo: deleteBtn.leadingAnchor, constant: -4),
-            pauseBtn.widthAnchor.constraint(equalToConstant: 36),
-            pauseBtn.heightAnchor.constraint(equalToConstant: 36),
+        textLabel?.frame.origin.x = left
+        textLabel?.frame.size.width = right - left - btnArea
+        detailTextLabel?.frame.origin.x = left
+        detailTextLabel?.frame.size.width = right - left - btnArea
 
-            deleteBtn.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            deleteBtn.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor),
-            deleteBtn.widthAnchor.constraint(equalToConstant: 36),
-            deleteBtn.heightAnchor.constraint(equalToConstant: 36),
-        ])
+        statusLabel.frame = CGRect(x: left, y: detailTextLabel?.frame.maxY ?? textLabel!.frame.maxY + 2, width: right - left - btnArea, height: 16)
+        progressView.frame = CGRect(x: left, y: statusLabel.frame.maxY + 4, width: right - left - btnArea, height: 6)
+
+        let btnY = (contentView.frame.height - 32) / 2
+        deleteBtn.frame = CGRect(x: right - 36, y: btnY, width: 32, height: 32)
+        pauseBtn.frame = CGRect(x: right - 72, y: btnY, width: 32, height: 32)
     }
 
     required init?(coder: NSCoder) { nil }
@@ -249,12 +240,11 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
 
         cell.textLabel?.text = book.name
         cell.backgroundColor = .white
-        cell.pauseBtn.alpha = task != nil ? 1 : 0
-        cell.pauseBtn.isUserInteractionEnabled = task != nil
-        cell.deleteBtn.alpha = task == nil && cached > 0 ? 1 : 0.2
-        cell.deleteBtn.isUserInteractionEnabled = task == nil && cached > 0
+        cell.detailTextLabel?.text = nil
 
         if let t = task {
+            cell.pauseBtn.isHidden = false
+            cell.deleteBtn.isHidden = true
             cell.pauseBtn.setImage(UIImage(systemName: t.isPaused ? "play.fill" : "pause.fill"), for: .normal)
             cell.pauseBtn.tag = ip.row
             cell.pauseBtn.removeTarget(nil, action: nil, for: .allEvents)
@@ -264,7 +254,7 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
             cell.deleteBtn.addTarget(self, action: #selector(deleteTapped(_:)), for: .touchUpInside)
             let progress = t.total > 0 ? Float(t.currentIndex) / Float(t.total) : 0
             cell.progressView.progress = progress
-            cell.progressView.alpha = 1
+            cell.progressView.isHidden = false
             if t.isPaused {
                 cell.statusLabel.text = "已暂停 \(t.currentIndex)/\(t.total) 章"
                 cell.textLabel?.textColor = .systemOrange
@@ -275,21 +265,22 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
                 cell.progressView.progressTintColor = .systemBlue
             }
         } else {
+            cell.pauseBtn.isHidden = true
+            cell.deleteBtn.isHidden = cached == 0
+            cell.deleteBtn.tag = ip.row
+            cell.deleteBtn.removeTarget(nil, action: nil, for: .allEvents)
+            cell.deleteBtn.addTarget(self, action: #selector(deleteTapped(_:)), for: .touchUpInside)
             if total > 0 {
-                let progress = Float(cached) / Float(total)
-                cell.progressView.progress = progress
-                cell.progressView.alpha = 1
+                cell.progressView.isHidden = false
+                cell.progressView.progress = Float(cached) / Float(total)
                 cell.statusLabel.text = "已缓存 \(cached)/\(total) 章"
                 cell.textLabel?.textColor = .darkText
                 cell.progressView.progressTintColor = cached >= total ? .systemGreen : .systemBlue
             } else {
-                cell.progressView.alpha = 0
+                cell.progressView.isHidden = true
                 cell.statusLabel.text = cached > 0 ? "已缓存 \(cached) 章（部分）" : "未缓存"
                 cell.textLabel?.textColor = .darkText
             }
-            cell.deleteBtn.tag = ip.row
-            cell.deleteBtn.removeTarget(nil, action: nil, for: .allEvents)
-            cell.deleteBtn.addTarget(self, action: #selector(deleteTapped(_:)), for: .touchUpInside)
         }
         return cell
     }
