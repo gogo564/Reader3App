@@ -90,12 +90,19 @@ class NetworkService {
     func getBookContent(bookUrl: String, index: Int, refresh: Bool = false) async throws -> String {
         var query: [String: String] = ["url": bookUrl, "index": String(index)]
         if refresh { query["refresh"] = "1" }
-        let data = try await get("/getBookContent", query: query)
-        let resp = try JSONDecoder().decode(APIResponse<String>.self, from: data)
-        guard resp.isSuccess, let content = resp.data else {
-            throw APIError.apiError(resp.errorMsg ?? "获取内容失败")
+        for attempt in 0..<2 {
+            let data = try await get("/getBookContent", query: query)
+            let resp = try JSONDecoder().decode(APIResponse<String>.self, from: data)
+            guard resp.isSuccess, let content = resp.data else {
+                let msg = resp.errorMsg ?? "获取内容失败"
+                if attempt == 0 && (msg.localizedCaseInsensitiveContains("timeout") || msg.localizedCaseInsensitiveContains("timed out")) {
+                    continue
+                }
+                throw APIError.apiError(msg)
+            }
+            return content
         }
-        return content
+        throw APIError.apiError("获取内容超时，请稍后重试")
     }
 
     func saveBookProgress(bookUrl: String, index: Int, title: String? = nil, bookName: String? = nil, time: Int64) async throws {
