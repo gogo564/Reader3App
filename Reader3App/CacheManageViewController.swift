@@ -101,6 +101,7 @@ class CacheManageViewController: UIViewController {
         let alert = UIAlertController(title: "清除缓存", message: "确定清除「\(book.name)」的本地缓存吗？", preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "清除", style: .destructive) { [weak self] _ in
+            CacheTaskManager.shared.cancel(book.bookUrl)
             CacheManager.shared.clearCache(bookUrl: book.bookUrl)
             self?.tableView.reloadData()
         })
