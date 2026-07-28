@@ -127,6 +127,16 @@ extension DZMReadController {
 
         if record.isFirstPage {
             if !recordModel.isFirstChapter, let cid = chapterID {
+                let prevIndex = cid.intValue
+                if let cached = CacheManager.shared.getCachedChapter(bookUrl: bookID, index: prevIndex) {
+                    let cm = buildChapterModel(bookID: bookID, chapterID: cid, index: prevIndex, content: cached)
+                    let nr = DZMReadRecordModel()
+                    nr.bookID = bookID
+                    nr.chapterModel = cm
+                    nr.page = NSNumber(value: max(cm.pageCount.intValue - 1, 0))
+                    updateReadRecord(recordModel: nr)
+                    return nr
+                }
                 loadAndShowChapter(bookID: bookID, chapterID: cid, recordModel: record, toPage: DZM_READ_LAST_PAGE, isLocation: false)
             }
             return nil
@@ -149,6 +159,16 @@ extension DZMReadController {
 
         if record.isLastPage {
             if !record.isLastChapter, let cid = chapterID {
+                let nextIndex = cid.intValue
+                if let cached = CacheManager.shared.getCachedChapter(bookUrl: bookID, index: nextIndex) {
+                    let cm = buildChapterModel(bookID: bookID, chapterID: cid, index: nextIndex, content: cached)
+                    let nr = DZMReadRecordModel()
+                    nr.bookID = bookID
+                    nr.chapterModel = cm
+                    nr.page = NSNumber(value: 0)
+                    updateReadRecord(recordModel: nr)
+                    return nr
+                }
                 loadAndShowChapter(bookID: bookID, chapterID: cid, recordModel: record, toPage: 0, isLocation: false)
             }
             return nil
@@ -156,6 +176,19 @@ extension DZMReadController {
             record.nextPage()
         }
         return record
+    }
+
+    private func buildChapterModel(bookID: String, chapterID: NSNumber, index: Int, content: String) -> DZMReadChapterModel {
+        let cm = DZMReadChapterModel()
+        cm.bookID = bookID
+        cm.id = chapterID
+        cm.name = catalogChapters[safe: index]?.title ?? ""
+        cm.content = DZMReadParser.contentTypesetting(content: content)
+        cm.priority = NSNumber(value: index)
+        cm.previousChapterID = index > 0 ? NSNumber(value: index - 1) : DZM_READ_NO_MORE_CHAPTER
+        cm.nextChapterID = index < catalogChapters.count - 1 ? NSNumber(value: index + 1) : DZM_READ_NO_MORE_CHAPTER
+        cm.updateFont()
+        return cm
     }
 
     func updateReadRecord(controller: DZMReadViewController!) {
