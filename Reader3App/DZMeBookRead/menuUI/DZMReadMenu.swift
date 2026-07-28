@@ -177,10 +177,8 @@ class DZMReadMenu: NSObject,UIGestureRecognizerDelegate {
     private func initCover() {
         
         cover = UIView()
-        cover.alpha = CGFloat(NSNumber(value: DZMUserDefaults.bool(DZM_READ_KEY_MODE_DAY_NIGHT)).floatValue)
         cover.isUserInteractionEnabled = false
         cover.backgroundColor = UIColor.black.withAlphaComponent(0.7)
-        vc.view.addSubview(cover)
         cover.frame = vc.view.bounds
     }
     

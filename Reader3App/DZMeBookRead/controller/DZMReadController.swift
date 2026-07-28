@@ -251,7 +251,6 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         }
         config.save()
         view.backgroundColor = config.bgColor
-        readMenu.cover.alpha = isNight ? 1.0 : 0.0
         creatPageController(displayController: GetCurrentReadViewController())
     }
     
