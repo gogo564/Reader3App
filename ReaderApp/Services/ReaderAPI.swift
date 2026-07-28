@@ -81,6 +81,17 @@ class ReaderAPI {
         _ = try await post("\(apiPrefix)/deleteBook", body: body)
     }
 
+    func deleteBookSafe(bookURL: String) {
+        Task {
+            do {
+                try await deleteBook(bookURL: bookURL)
+            } catch {
+                if case APIError.notLoggedIn = error { return }
+                ServerManager.shared.addPendingDelete(bookUrl: bookURL)
+            }
+        }
+    }
+
     // MARK: - Book Sources
     func getBookSources() async throws -> [BookSource] {
         let data = try await get("\(apiPrefix)/getBookSources")

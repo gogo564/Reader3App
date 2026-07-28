@@ -41,6 +41,13 @@ struct ShelfView: View {
                                 NavigationLink(destination: ReaderView(book: book)) {
                                     BookCard(book: book)
                                 }
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        deleteBook(book)
+                                    } label: {
+                                        Label("删除", systemImage: "trash")
+                                    }
+                                }
                             }
                         }
                         .padding()
@@ -63,6 +70,7 @@ struct ShelfView: View {
                     books = shelf
                     isLoading = false
                 }
+                await ServerManager.shared.syncPendingDeletes()
             } catch {
                 await MainActor.run {
                     errorMsg = error.localizedDescription
@@ -70,6 +78,13 @@ struct ShelfView: View {
                 }
             }
         }
+    }
+
+    private func deleteBook(_ book: Book) {
+        withAnimation {
+            books.removeAll { $0.id == book.id }
+        }
+        ReaderAPI.shared.deleteBookSafe(bookURL: book.bookUrl)
     }
 }
 

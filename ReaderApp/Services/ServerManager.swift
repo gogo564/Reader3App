@@ -17,6 +17,8 @@ class ServerManager: ObservableObject {
     @Published var username = ""
     @Published var connectionError: Error?
 
+    private let pendingDeleteKey = "pendingDeletes"
+
     private init() {
         serverURL = UserDefaults.standard.string(forKey: "serverURL")
     }
@@ -24,6 +26,36 @@ class ServerManager: ObservableObject {
     var baseURL: String {
         guard let url = serverURL else { return "" }
         return url.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    var pendingDeletes: [String] {
+        get { UserDefaults.standard.stringArray(forKey: pendingDeleteKey) ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: pendingDeleteKey) }
+    }
+
+    func addPendingDelete(bookUrl: String) {
+        var list = pendingDeletes
+        if !list.contains(bookUrl) {
+            list.append(bookUrl)
+            pendingDeletes = list
+        }
+    }
+
+    func removePendingDelete(bookUrl: String) {
+        pendingDeletes = pendingDeletes.filter { $0 != bookUrl }
+    }
+
+    func syncPendingDeletes() async {
+        let list = pendingDeletes
+        guard !list.isEmpty else { return }
+        for bookUrl in list {
+            do {
+                try await ReaderAPI.shared.deleteBook(bookURL: bookUrl)
+                await MainActor.run { removePendingDelete(bookUrl: bookUrl) }
+            } catch {
+                if case APIError.notLoggedIn = error { return }
+            }
+        }
     }
 
     func login(username: String, password: String) async throws {
@@ -79,7 +111,7 @@ class ServerManager: ObservableObject {
 
     func reset() {
         logout()
+        pendingDeletes = []
         serverURL = nil
     }
 }
-Cg==
