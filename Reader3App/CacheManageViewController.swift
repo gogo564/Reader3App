@@ -4,17 +4,6 @@ class CacheManageViewController: UIViewController {
     private var books: [Book] = []
     private weak var shelfVC: ShelfViewController?
     private var tableView: UITableView!
-    private var cacheTasks: [String: CacheTask] = [:]
-
-    private class CacheTask {
-        let book: Book
-        var isPaused = false
-        var isCancelled = false
-        var currentIndex = 0
-        var total = 0
-
-        init(book: Book) { self.book = book }
-    }
 
     init(books: [Book], shelfVC: ShelfViewController) {
         self.books = books
@@ -35,10 +24,24 @@ class CacheManageViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        let nc = NotificationCenter.default
+        nc.addObserver(self, selector: #selector(handleProgress(_:)), name: CacheTaskManager.progressNotification, object: nil)
+        nc.addObserver(self, selector: #selector(handleCompleted(_:)), name: CacheTaskManager.completedNotification, object: nil)
+        nc.addObserver(self, selector: #selector(handleFailed(_:)), name: CacheTaskManager.failedNotification, object: nil)
         tableView.reloadData()
     }
 
-    deinit { cancelAllTasks() }
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        let nc = NotificationCenter.default
+        nc.removeObserver(self, name: CacheTaskManager.progressNotification, object: nil)
+        nc.removeObserver(self, name: CacheTaskManager.completedNotification, object: nil)
+        nc.removeObserver(self, name: CacheTaskManager.failedNotification, object: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 
     private func setupTableView() {
         tableView = UITableView(frame: .zero, style: .insetGrouped)
@@ -70,73 +73,28 @@ class CacheManageViewController: UIViewController {
             let cached = CacheManager.shared.cachedCount(book.bookUrl)
             let total = CacheManager.shared.cachedTotal(book.bookUrl)
             if total > 0 && cached >= total { continue }
-            startCaching(book)
+            CacheTaskManager.shared.start(book)
         }
     }
 
-    private func startCaching(_ book: Book) {
-        guard NetworkMonitor.shared.isConnected else {
-            let alert = UIAlertController(title: "缓存失败", message: "当前无网络连接", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "确定", style: .default))
-            present(alert, animated: true)
-            return
-        }
-        if cacheTasks[book.bookUrl] != nil { return }
-        let task = CacheTask(book: book)
-        cacheTasks[book.bookUrl] = task
+    @objc private func handleProgress(_ n: Notification) {
+        guard let url = n.userInfo?["bookUrl"] as? String else { return }
+        reloadVisibleRow(bookUrl: url)
+    }
+
+    @objc private func handleCompleted(_ n: Notification) {
         tableView.reloadData()
-        performCaching(task)
+        shelfVC?.loadBooks()
     }
 
-    private func performCaching(_ task: CacheTask) {
-        Task {
-            do {
-                let chapters = try await NetworkService.shared.getChapterList(bookUrl: task.book.bookUrl)
-                task.total = chapters.count
-                CacheManager.shared.setCachedTotal(task.book.bookUrl, total: task.total)
-                CacheManager.shared.cacheChapters(bookUrl: task.book.bookUrl, chapters: chapters)
-                for i in task.currentIndex..<task.total {
-                    if task.isCancelled { return }
-                    while task.isPaused {
-                        try await Task.sleep(nanoseconds: 500_000_000)
-                        if task.isCancelled { return }
-                    }
-                    if CacheManager.shared.isChapterCached(bookUrl: task.book.bookUrl, index: i) {
-                        task.currentIndex = i + 1
-                        await MainActor.run { [weak self] in self?.reloadVisibleRow(bookUrl: task.book.bookUrl) }
-                        continue
-                    }
-                    let content = try await NetworkService.shared.getBookContent(bookUrl: task.book.bookUrl, index: i)
-                    CacheManager.shared.cacheChapter(bookUrl: task.book.bookUrl, index: i, content: content)
-                    task.currentIndex = i + 1
-                    await MainActor.run { [weak self] in self?.reloadVisibleRow(bookUrl: task.book.bookUrl) }
-                }
-                await MainActor.run { [weak self] in
-                    self?.cacheTasks.removeValue(forKey: task.book.bookUrl)
-                    self?.tableView.reloadData()
-                    self?.shelfVC?.loadBooks()
-                }
-            } catch {
-                await MainActor.run { [weak self] in
-                    self?.cacheTasks.removeValue(forKey: task.book.bookUrl)
-                    self?.tableView.reloadData()
-                }
-            }
-        }
+    @objc private func handleFailed(_ n: Notification) {
+        tableView.reloadData()
     }
 
     private func reloadVisibleRow(bookUrl: String) {
         guard let idx = books.firstIndex(where: { $0.bookUrl == bookUrl }),
-              let cells = tableView.visibleCells as? [UITableViewCell],
-              idx + 1 < cells.count + (tableView.numberOfRows(inSection: 0) - books.count) else { return }
+              idx + 1 < tableView.numberOfRows(inSection: 0) else { return }
         tableView.reloadRows(at: [IndexPath(row: idx + 1, section: 0)], with: .none)
-    }
-
-    private func cancelAllTasks() {
-        for task in cacheTasks.values {
-            task.isCancelled = true
-        }
-        cacheTasks.removeAll()
     }
 
     private func clearCache(_ book: Book) {
@@ -170,24 +128,7 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
         } else {
             cell = UITableViewCell(style: reuseId == "subtitle" ? .subtitle : .default, reuseIdentifier: reuseId)
         }
-        if ip.row > 0, reuseId == "subtitle" {
-            let book = books[ip.row - 1]
-            let cached = CacheManager.shared.cachedCount(book.bookUrl)
-            let task = cacheTasks[book.bookUrl]
-            if task == nil, cached > 0 {
-                let btn = UIButton(type: .system)
-                btn.setImage(UIImage(systemName: "trash"), for: .normal)
-                btn.tintColor = .systemRed
-                btn.frame = CGRect(x: 0, y: 0, width: 32, height: 32)
-                btn.tag = ip.row
-                btn.addTarget(self, action: #selector(deleteTapped(_:)), for: .touchUpInside)
-                cell.accessoryView = btn
-            } else {
-                cell.accessoryView = nil
-            }
-        } else {
-            cell.accessoryView = nil
-        }
+        cell.accessoryView = nil
         if books.isEmpty {
             cell.textLabel?.text = "暂无书籍"
             cell.textLabel?.textColor = .secondaryLabel
@@ -210,17 +151,17 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
         let book = books[ip.row - 1]
         let cached = CacheManager.shared.cachedCount(book.bookUrl)
         let total = CacheManager.shared.cachedTotal(book.bookUrl)
-        let task = cacheTasks[book.bookUrl]
+        let state = CacheTaskManager.shared.state(for: book.bookUrl)
 
         cell.textLabel?.text = book.name
         cell.backgroundColor = .white
 
-        if let t = task {
-            if t.isPaused {
-                cell.detailTextLabel?.text = "已暂停 \(t.currentIndex)/\(t.total) 章"
+        if let s = state {
+            if s.isPaused {
+                cell.detailTextLabel?.text = "已暂停 \(s.currentIndex)/\(s.total) 章"
                 cell.textLabel?.textColor = .systemOrange
             } else {
-                cell.detailTextLabel?.text = "缓存中 \(t.currentIndex)/\(t.total) 章"
+                cell.detailTextLabel?.text = "缓存中 \(s.currentIndex)/\(s.total) 章"
                 cell.textLabel?.textColor = .systemBlue
             }
             cell.selectionStyle = .default
@@ -237,14 +178,25 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
             cell.textLabel?.textColor = .darkText
             cell.selectionStyle = .default
         }
+
+        if cached > 0 {
+            let btn = UIButton(type: .system)
+            btn.setImage(UIImage(systemName: "trash"), for: .normal)
+            btn.tintColor = .systemRed
+            btn.frame = CGRect(x: 0, y: 0, width: 32, height: 32)
+            btn.tag = ip.row
+            btn.addTarget(self, action: #selector(deleteTapped(_:)), for: .touchUpInside)
+            cell.accessoryView = btn
+        }
+
         return cell
     }
 
     func tableView(_: UITableView, didSelectRowAt ip: IndexPath) {
         guard ip.row > 0 else { return }
         let book = books[ip.row - 1]
-        if let task = cacheTasks[book.bookUrl] {
-            task.isPaused.toggle()
+        if CacheTaskManager.shared.isCaching(book.bookUrl) {
+            CacheTaskManager.shared.togglePause(book.bookUrl)
             tableView.reloadData()
         } else {
             let cached = CacheManager.shared.cachedCount(book.bookUrl)
@@ -252,7 +204,8 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
             if total > 0 && cached >= total {
                 clearCache(book)
             } else {
-                startCaching(book)
+                CacheTaskManager.shared.start(book)
+                tableView.reloadData()
             }
         }
     }
@@ -260,7 +213,7 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
     func tableView(_: UITableView, trailingSwipeActionsConfigurationForRowAt ip: IndexPath) -> UISwipeActionsConfiguration? {
         guard ip.row > 0 else { return nil }
         let book = books[ip.row - 1]
-        if cacheTasks[book.bookUrl] != nil { return nil }
+        if CacheTaskManager.shared.isCaching(book.bookUrl) { return nil }
         let cached = CacheManager.shared.cachedCount(book.bookUrl)
         guard cached > 0 else { return nil }
         let clear = UIContextualAction(style: .destructive, title: "清除") { [weak self] _, _, done in
