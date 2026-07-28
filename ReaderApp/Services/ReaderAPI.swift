@@ -99,8 +99,9 @@ class ReaderAPI {
     }
 
     func searchBooks(keyword: String, page: Int = 1) async throws -> [SearchResult] {
-        let body = try JSONEncoder().encode(["keyword": keyword, "page": page])
-        let data = try await post("\(apiPrefix)/searchBook", body: body)
+        let body: [String: Any] = ["keyword": keyword, "page": page]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        let data = try await post("\(apiPrefix)/searchBook", body: bodyData)
         return try decode(data) as [SearchResult]
     }
 
