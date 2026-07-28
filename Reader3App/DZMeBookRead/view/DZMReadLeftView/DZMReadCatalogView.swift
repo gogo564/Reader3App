@@ -102,6 +102,10 @@ class DZMReadCatalogView: UIView,UITableViewDelegate,UITableViewDataSource {
             
         }else{ cell.chapterName.textColor = DZM_COLOR_145_145_145 }
         
+        // 缓存状态
+        let isCached = CacheManager.shared.isChapterCached(bookUrl: readModel.bookID, index: chapterListModel.id.intValue)
+        cell.cacheDot.isHidden = !isCached
+        
         return cell
     }
     
