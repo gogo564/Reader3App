@@ -127,20 +127,37 @@ class SyncQueue: NSObject {
         let conflict = c.remove(at: idx)
         conflictStore = c
 
+        // 移除该书的待同步进度 op，避免重复冲突
+        var q = queue
+        q.removeAll { $0.bookUrl == conflict.bookUrl && $0.type == .saveProgress }
+        queue = q
+
         if useLocal {
-            let dict: [String: Any] = [
-                "bookUrl": conflict.bookUrl,
-                "durChapterIndex": conflict.localIndex,
-                "durChapterTitle": conflict.localTitle ?? "",
-                "durChapterTime": conflict.localTime
-            ]
-            if let payload = try? JSONSerialization.data(withJSONObject: dict) {
-                let op = SyncOperation(id: conflict.opId, type: .saveProgress, bookUrl: conflict.bookUrl, payload: payload)
-                var q = queue
-                q.append(op)
-                queue = q
+            do {
+                try await NetworkService.shared.saveBookProgress(
+                    bookUrl: conflict.bookUrl,
+                    index: conflict.localIndex,
+                    title: conflict.localTitle,
+                    bookName: conflict.bookName,
+                    time: conflict.localTime
+                )
+            } catch {
+                // 直接写入失败时回退到队列
+                let dict: [String: Any] = [
+                    "bookUrl": conflict.bookUrl,
+                    "durChapterIndex": conflict.localIndex,
+                    "durChapterTitle": conflict.localTitle ?? "",
+                    "durChapterTime": conflict.localTime
+                ]
+                if let payload = try? JSONSerialization.data(withJSONObject: dict) {
+                    let op = SyncOperation(id: UUID().uuidString, type: .saveProgress, bookUrl: conflict.bookUrl, payload: payload)
+                    q = queue
+                    q.append(op)
+                    queue = q
+                }
             }
         }
+        // 处理队列中剩余的 op（不含已解决的冲突书籍）
         await processAll()
     }
 

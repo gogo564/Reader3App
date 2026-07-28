@@ -86,15 +86,11 @@ class ShelfViewController: UIViewController {
         networkBar.backgroundColor = online
             ? UIColor(white: 1, alpha: 0.9)
             : UIColor(red: 1, green: 0.95, blue: 0.95, alpha: 0.95)
-        if !online || pending > 0 {
-            networkBar.isHidden = false
-        } else {
-            networkBar.isHidden = true
-        }
+        networkBar.isHidden = false
     }
 
     private func setupNetworkBar() {
-        networkBar.isHidden = true
+        networkBar.isHidden = false
         networkBar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(networkBar)
 
@@ -167,7 +163,7 @@ class ShelfViewController: UIViewController {
             navigationItem.rightBarButtonItem = UIBarButtonItem(title: "完成", style: .done, target: self, action: #selector(toggleEdit))
         } else {
             let offlineBtn = UIBarButtonItem(
-                title: offlineMode ? "离线" : "在线",
+                title: offlineMode ? "在线" : "离线",
                 style: .plain, target: self, action: #selector(toggleOffline)
             )
             let editBtn = UIBarButtonItem(title: "编辑", style: .plain, target: self, action: #selector(toggleEdit))
