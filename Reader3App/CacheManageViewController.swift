@@ -38,10 +38,7 @@ class CacheManageViewController: UIViewController {
         tableView.reloadData()
     }
 
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        cancelAllTasks()
-    }
+    deinit { cancelAllTasks() }
 
     private func setupTableView() {
         tableView = UITableView(frame: .zero, style: .insetGrouped)
@@ -106,26 +103,33 @@ class CacheManageViewController: UIViewController {
                     }
                     if CacheManager.shared.isChapterCached(bookUrl: task.book.bookUrl, index: i) {
                         task.currentIndex = i + 1
-                        await MainActor.run { self.tableView.reloadData() }
+                        await MainActor.run { [weak self] in self?.reloadVisibleRow(bookUrl: task.book.bookUrl) }
                         continue
                     }
                     let content = try await NetworkService.shared.getBookContent(bookUrl: task.book.bookUrl, index: i)
                     CacheManager.shared.cacheChapter(bookUrl: task.book.bookUrl, index: i, content: content)
                     task.currentIndex = i + 1
-                    await MainActor.run { self.tableView.reloadData() }
+                    await MainActor.run { [weak self] in self?.reloadVisibleRow(bookUrl: task.book.bookUrl) }
                 }
-                await MainActor.run {
-                    self.cacheTasks.removeValue(forKey: task.book.bookUrl)
-                    self.tableView.reloadData()
-                    self.shelfVC?.loadBooks()
+                await MainActor.run { [weak self] in
+                    self?.cacheTasks.removeValue(forKey: task.book.bookUrl)
+                    self?.tableView.reloadData()
+                    self?.shelfVC?.loadBooks()
                 }
             } catch {
-                await MainActor.run {
-                    self.cacheTasks.removeValue(forKey: task.book.bookUrl)
-                    self.tableView.reloadData()
+                await MainActor.run { [weak self] in
+                    self?.cacheTasks.removeValue(forKey: task.book.bookUrl)
+                    self?.tableView.reloadData()
                 }
             }
         }
+    }
+
+    private func reloadVisibleRow(bookUrl: String) {
+        guard let idx = books.firstIndex(where: { $0.bookUrl == bookUrl }),
+              let cells = tableView.visibleCells as? [UITableViewCell],
+              idx + 1 < cells.count + (tableView.numberOfRows(inSection: 0) - books.count) else { return }
+        tableView.reloadRows(at: [IndexPath(row: idx + 1, section: 0)], with: .none)
     }
 
     private func cancelAllTasks() {
@@ -144,6 +148,12 @@ class CacheManageViewController: UIViewController {
         })
         present(alert, animated: true)
     }
+
+    @objc private func deleteTapped(_ sender: UIView) {
+        let row = sender.tag
+        guard row > 0, row - 1 < books.count else { return }
+        clearCache(books[row - 1])
+    }
 }
 
 extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate {
@@ -160,7 +170,24 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
         } else {
             cell = UITableViewCell(style: reuseId == "subtitle" ? .subtitle : .default, reuseIdentifier: reuseId)
         }
-        cell.accessoryType = .none
+        if ip.row > 0, reuseId == "subtitle" {
+            let book = books[ip.row - 1]
+            let cached = CacheManager.shared.cachedCount(book.bookUrl)
+            let task = cacheTasks[book.bookUrl]
+            if task == nil, cached > 0 {
+                let btn = UIButton(type: .system)
+                btn.setImage(UIImage(systemName: "trash"), for: .normal)
+                btn.tintColor = .systemRed
+                btn.frame = CGRect(x: 0, y: 0, width: 32, height: 32)
+                btn.tag = ip.row
+                btn.addTarget(self, action: #selector(deleteTapped(_:)), for: .touchUpInside)
+                cell.accessoryView = btn
+            } else {
+                cell.accessoryView = nil
+            }
+        } else {
+            cell.accessoryView = nil
+        }
         if books.isEmpty {
             cell.textLabel?.text = "暂无书籍"
             cell.textLabel?.textColor = .secondaryLabel
