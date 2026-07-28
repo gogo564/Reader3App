@@ -2,7 +2,7 @@ import Foundation
 
 enum APIError: LocalizedError {
     case invalidURL, networkError(Error), serverError(Int)
-    case decodeError(String), apiError(String)
+    case decodeError(String), apiError(String), notLoggedIn
 
     var errorDescription: String? {
         switch self {
@@ -11,6 +11,7 @@ enum APIError: LocalizedError {
         case .serverError(let c): return "服务器错误: \(c)"
         case .decodeError(let m): return "数据解析失败: \(m)"
         case .apiError(let m): return m
+        case .notLoggedIn: return "未登录，请重新登录"
         }
     }
 }
@@ -25,19 +26,13 @@ class NetworkService {
     func login(username: String, password: String, isLogin: Bool = true) async throws -> LoginResult {
         let body = try JSONSerialization.data(withJSONObject: [
             "username": username, "password": password, "isLogin": isLogin
-        ])
+        ] as [String: Any])
         let data = try await post("/login", body: body)
         let resp = try JSONDecoder().decode(APIResponse<LoginResult>.self, from: data)
         guard resp.isSuccess, let result = resp.data else {
             throw APIError.apiError(resp.errorMsg ?? "请求失败")
         }
         return result
-    }
-
-    // MARK: - User Info
-    func getUserInfo() async throws -> UserInfo {
-        let data = try await get("/getUserInfo")
-        return try decode(data)
     }
 
     // MARK: - Bookshelf
@@ -57,45 +52,18 @@ class NetworkService {
         _ = try await post("/deleteBook", body: body)
     }
 
-    // MARK: - Book Groups
-    func getBookGroups() async throws -> [BookGroup] {
-        let data = try await get("/getBookGroups")
-        return try decode(data)
-    }
-
     // MARK: - Book Sources
     func getBookSources(simple: Bool = true) async throws -> [BookSource] {
         let data = try await get("/getBookSources", query: ["simple": "1"])
         return try decode(data)
     }
 
-    func getAvailableBookSource(bookUrl: String, refresh: Bool = false) async throws -> [SearchResult] {
-        let body = try JSONSerialization.data(withJSONObject: ["url": bookUrl, "refresh": refresh ? 1 : 0])
-        let data = try await post("/getAvailableBookSource", body: body)
-        return try decode(data)
-    }
-
-    func setBookSource(bookUrl: String, newUrl: String, bookSourceUrl: String) async throws {
-        let body = try JSONSerialization.data(withJSONObject: [
-            "bookUrl": bookUrl, "newUrl": newUrl, "bookSourceUrl": bookSourceUrl
-        ])
-        _ = try await post("/setBookSource", body: body)
-    }
-
     // MARK: - Search
-    func searchBook(key: String, searchType: String, bookSourceUrl: String = "",
-                    bookSourceGroup: String = "", concurrentCount: Int = 24,
-                    page: Int = 1, lastIndex: Int = -1) async throws -> [SearchResult] {
+    func searchBook(key: String, bookSourceUrl: String = "", page: Int = 1) async throws -> [SearchResult] {
         let body = try JSONSerialization.data(withJSONObject: [
-            "key": key,
-            "bookSourceUrl": bookSourceUrl,
-            "bookSourceGroup": bookSourceGroup,
-            "concurrentCount": concurrentCount,
-            "lastIndex": lastIndex,
-            "page": page
-        ])
-        let path = searchType == "single" ? "/searchBook" : "/searchBookMulti"
-        let data = try await post(path, body: body, timeout: searchType == "single" ? 30 : 180)
+            "key": key, "bookSourceUrl": bookSourceUrl, "page": page
+        ] as [String: Any])
+        let data = try await post("/searchBook", body: body)
         let resp = try JSONDecoder().decode(APIResponse<SearchMultiResponse>.self, from: data)
         guard resp.isSuccess, let result = resp.data else {
             throw APIError.apiError(resp.errorMsg ?? "搜索失败")
@@ -111,10 +79,9 @@ class NetworkService {
         return try decode(data)
     }
 
-    func getBookContent(bookUrl: String, index: Int, refresh: Bool = false, cache: Bool = false) async throws -> String {
+    func getBookContent(bookUrl: String, index: Int, refresh: Bool = false) async throws -> String {
         var query: [String: String] = ["url": bookUrl, "index": String(index)]
         if refresh { query["refresh"] = "1" }
-        if cache { query["cache"] = "1" }
         let data = try await get("/getBookContent", query: query)
         let resp = try JSONDecoder().decode(APIResponse<String>.self, from: data)
         guard resp.isSuccess, let content = resp.data else {
@@ -154,49 +121,16 @@ class NetworkService {
         _ = try await post("/deleteBookmark", body: body)
     }
 
-    func deleteBookmarks(_ bookmarks: [BookmarkItem]) async throws {
-        let body = try JSONEncoder().encode(bookmarks)
-        _ = try await post("/deleteBookmarks", body: body)
-    }
-
-    // MARK: - Replace Rules
-    func getReplaceRules() async throws -> [ReplaceRule] {
-        let data = try await get("/getReplaceRules")
-        return try decode(data)
-    }
-
-    func saveReplaceRule(_ rule: ReplaceRule) async throws {
-        let body = try JSONEncoder().encode(rule)
-        _ = try await post("/saveReplaceRule", body: body)
-    }
-
-    func deleteReplaceRule(_ rule: ReplaceRule) async throws {
-        let body = try JSONEncoder().encode(rule)
-        _ = try await post("/deleteReplaceRule", body: body)
-    }
-
-    // MARK: - Explore
-    func exploreBook(bookSourceUrl: String) async throws -> [SearchResult] {
-        let body = try JSONEncoder().encode(["bookSourceUrl": bookSourceUrl])
-        let data = try await post("/exploreBook", body: body)
-        return try decode(data)
-    }
-
-    // MARK: - Test Connection
-    func testConnection(serverURL: String) async throws {
-        guard let url = URL(string: "\(serverURL)/reader3/getBookSources") else {
-            throw APIError.invalidURL
-        }
-        let (_, resp) = try await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 10))
-        guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw APIError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0)
-        }
-    }
-
     // MARK: - Private
     private func decode<T: Codable>(_ data: Data) throws -> T {
         let resp = try JSONDecoder().decode(APIResponse<T>.self, from: data)
-        guard resp.isSuccess else { throw APIError.apiError(resp.errorMsg ?? "请求失败") }
+        guard resp.isSuccess else {
+            if resp.errorMsg == "请登录后使用" || resp.errorMsg == "NEED_LOGIN" {
+                DispatchQueue.main.async { AppState.shared.isLoggedIn = false }
+                throw APIError.notLoggedIn
+            }
+            throw APIError.apiError(resp.errorMsg ?? "请求失败")
+        }
         guard let result = resp.data else { throw APIError.decodeError("data 为空") }
         return result
     }
@@ -204,23 +138,32 @@ class NetworkService {
     private func buildURL(_ path: String, query: [String: String]? = nil) throws -> URL {
         var comps = URLComponents(string: "\(appState.apiURL)\(path)")
         var items = query?.map { URLQueryItem(name: $0.key, value: $0.value) } ?? []
-        if !appState.accessToken.isEmpty {
-            items.append(URLQueryItem(name: "accessToken", value: appState.accessToken))
-        }
         if !items.isEmpty { comps?.queryItems = items }
         guard let url = comps?.url else { throw APIError.invalidURL }
         return url
     }
 
-    private let headers = ["Content-Type": "application/json"]
+    private var session: URLSession {
+        let config = URLSessionConfiguration.default
+        config.httpCookieStorage = HTTPCookieStorage.shared
+        config.httpShouldSetCookies = true
+        return URLSession(configuration: config)
+    }
 
     private func get(_ path: String, query: [String: String]? = nil) async throws -> Data {
         let url = try buildURL(path, query: query)
         var req = URLRequest(url: url, timeoutInterval: 30)
-        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw APIError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0)
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (data, resp) = try await session.data(for: req)
+        guard let http = resp as? HTTPURLResponse else {
+            throw APIError.serverError(0)
+        }
+        if http.statusCode == 401 {
+            DispatchQueue.main.async { AppState.shared.isLoggedIn = false }
+            throw APIError.notLoggedIn
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw APIError.serverError(http.statusCode)
         }
         return data
     }
@@ -230,24 +173,18 @@ class NetworkService {
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
         req.httpBody = body
-        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw APIError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0)
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (data, resp) = try await session.data(for: req)
+        guard let http = resp as? HTTPURLResponse else {
+            throw APIError.serverError(0)
+        }
+        if http.statusCode == 401 {
+            DispatchQueue.main.async { AppState.shared.isLoggedIn = false }
+            throw APIError.notLoggedIn
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw APIError.serverError(http.statusCode)
         }
         return data
-    }
-}
-
-extension JSONEncoder {
-    convenience init(_ strategy: KeyEncodingStrategy) {
-        self.init()
-        keyEncodingStrategy = strategy
-    }
-}
-
-extension Data {
-    init<T: Encodable>(from value: T) throws {
-        self = try JSONEncoder().encode(value)
     }
 }

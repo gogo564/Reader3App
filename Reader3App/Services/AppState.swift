@@ -6,6 +6,7 @@ class AppState {
 
     var serverURL: String = ""
     var isConnected: Bool = false
+    var isLoggedIn: Bool = false
 
     var apiURL: String { "\(serverURL)/reader3" }
     var baseURL: String { serverURL }
