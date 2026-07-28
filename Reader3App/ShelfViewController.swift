@@ -263,7 +263,7 @@ class ShelfViewController: UIViewController {
     @objc private func refreshBooks() {
         Task {
             do {
-                var books = try await NetworkService.shared.getBookshelf(refresh: true)
+                var books = try await NetworkService.shared.getBookshelf(refresh: false)
                 let cached = CacheManager.shared.getCachedBookshelf() ?? []
                 books = books.map { server in
                     guard let c = cached.first(where: { $0.bookUrl == server.bookUrl }),
