@@ -1,6 +1,7 @@
 import UIKit
 
 class CacheManagerCell: UITableViewCell {
+    let statusLabel = UILabel()
     let progressView: UIProgressView = {
         let p = UIProgressView(progressViewStyle: .bar)
         p.trackTintColor = UIColor.systemGray5
@@ -23,18 +24,27 @@ class CacheManagerCell: UITableViewCell {
     }()
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
-        super.init(style: .subtitle, reuseIdentifier: reuseIdentifier)
+        super.init(style: .default, reuseIdentifier: reuseIdentifier)
+        statusLabel.font = .systemFont(ofSize: 12)
+        statusLabel.textColor = .secondaryLabel
+        contentView.addSubview(statusLabel)
         contentView.addSubview(progressView)
         contentView.addSubview(pauseBtn)
         contentView.addSubview(deleteBtn)
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
         progressView.translatesAutoresizingMaskIntoConstraints = false
         pauseBtn.translatesAutoresizingMaskIntoConstraints = false
         deleteBtn.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
+            statusLabel.topAnchor.constraint(equalTo: textLabel!.bottomAnchor, constant: 2),
+            statusLabel.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
+            statusLabel.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor, constant: -90),
+
+            progressView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 4),
             progressView.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
             progressView.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor, constant: -90),
-            progressView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
             progressView.heightAnchor.constraint(equalToConstant: 6),
+            progressView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
 
             pauseBtn.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             pauseBtn.trailingAnchor.constraint(equalTo: deleteBtn.leadingAnchor, constant: -4),
@@ -142,6 +152,12 @@ class CacheManageViewController: UIViewController {
         performCaching(task)
     }
 
+    private func reloadRow(bookUrl: String) {
+        guard let idx = books.firstIndex(where: { $0.bookUrl == bookUrl }) else { return }
+        let ip = IndexPath(row: idx + 1, section: 0)
+        tableView.reloadRows(at: [ip], with: .none)
+    }
+
     private func performCaching(_ task: CacheTask) {
         Task {
             do {
@@ -157,13 +173,13 @@ class CacheManageViewController: UIViewController {
                     }
                     if CacheManager.shared.isChapterCached(bookUrl: task.book.bookUrl, index: i) {
                         task.currentIndex = i + 1
-                        await MainActor.run { self.tableView.reloadData() }
+                        await MainActor.run { self.reloadRow(bookUrl: task.book.bookUrl) }
                         continue
                     }
                     let content = try await NetworkService.shared.getBookContent(bookUrl: task.book.bookUrl, index: i)
                     CacheManager.shared.cacheChapter(bookUrl: task.book.bookUrl, index: i, content: content)
                     task.currentIndex = i + 1
-                    await MainActor.run { self.tableView.reloadData() }
+                    await MainActor.run { self.reloadRow(bookUrl: task.book.bookUrl) }
                 }
                 await MainActor.run {
                     self.cacheTasks.removeValue(forKey: task.book.bookUrl)
@@ -233,8 +249,10 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
 
         cell.textLabel?.text = book.name
         cell.backgroundColor = .white
-        cell.pauseBtn.isHidden = task == nil
-        cell.deleteBtn.isHidden = task != nil
+        cell.pauseBtn.alpha = task != nil ? 1 : 0
+        cell.pauseBtn.isUserInteractionEnabled = task != nil
+        cell.deleteBtn.alpha = task == nil && cached > 0 ? 1 : 0.2
+        cell.deleteBtn.isUserInteractionEnabled = task == nil && cached > 0
 
         if let t = task {
             cell.pauseBtn.setImage(UIImage(systemName: t.isPaused ? "play.fill" : "pause.fill"), for: .normal)
@@ -246,39 +264,32 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
             cell.deleteBtn.addTarget(self, action: #selector(deleteTapped(_:)), for: .touchUpInside)
             let progress = t.total > 0 ? Float(t.currentIndex) / Float(t.total) : 0
             cell.progressView.progress = progress
-            cell.progressView.isHidden = false
+            cell.progressView.alpha = 1
             if t.isPaused {
-                cell.detailTextLabel?.text = "已暂停 \(t.currentIndex)/\(t.total) 章"
+                cell.statusLabel.text = "已暂停 \(t.currentIndex)/\(t.total) 章"
                 cell.textLabel?.textColor = .systemOrange
                 cell.progressView.progressTintColor = .systemOrange
             } else {
-                cell.detailTextLabel?.text = "缓存中 \(t.currentIndex)/\(t.total) 章"
+                cell.statusLabel.text = "缓存中 \(t.currentIndex)/\(t.total) 章"
                 cell.textLabel?.textColor = .systemBlue
                 cell.progressView.progressTintColor = .systemBlue
             }
         } else {
-            cell.progressView.isHidden = false
             if total > 0 {
                 let progress = Float(cached) / Float(total)
                 cell.progressView.progress = progress
-                if cached >= total {
-                    cell.detailTextLabel?.text = "已缓存 \(cached)/\(total) 章"
-                    cell.textLabel?.textColor = .darkText
-                    cell.progressView.progressTintColor = .systemGreen
-                } else {
-                    cell.detailTextLabel?.text = "已缓存 \(cached)/\(total) 章"
-                    cell.textLabel?.textColor = .darkText
-                    cell.progressView.progressTintColor = .systemBlue
-                }
+                cell.progressView.alpha = 1
+                cell.statusLabel.text = "已缓存 \(cached)/\(total) 章"
+                cell.textLabel?.textColor = .darkText
+                cell.progressView.progressTintColor = cached >= total ? .systemGreen : .systemBlue
             } else {
-                cell.progressView.isHidden = true
-                cell.detailTextLabel?.text = cached > 0 ? "已缓存 \(cached) 章（部分）" : "未缓存"
+                cell.progressView.alpha = 0
+                cell.statusLabel.text = cached > 0 ? "已缓存 \(cached) 章（部分）" : "未缓存"
                 cell.textLabel?.textColor = .darkText
             }
             cell.deleteBtn.tag = ip.row
             cell.deleteBtn.removeTarget(nil, action: nil, for: .allEvents)
             cell.deleteBtn.addTarget(self, action: #selector(deleteTapped(_:)), for: .touchUpInside)
-            cell.deleteBtn.isHidden = cached == 0
         }
         return cell
     }

@@ -403,12 +403,8 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                     match = r
                     break
                 }
-                if match == nil {
-                    await MainActor.run { self.toast("未在本书源找到「\(bookName)」") }
-                    return
-                }
                 guard let m = match else {
-                    await MainActor.run { self.toast("该书源不可用") }
+                    await MainActor.run { self.toast("未在本书源找到「\(bookName)」") }
                     return
                 }
                 let newUrl = m.bookUrl
@@ -416,12 +412,26 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                     await MainActor.run { self.toast("该书源不可用") }
                     return
                 }
-                let chapters = try await chapterList!(newUrl)
+                let chapters = try await NetworkService.shared.getChapterList(bookUrl: newUrl, bookSourceUrl: srcUrl)
                 catalogChapters = chapters
-                let index = readModel.recordModel.chapterModel.id?.intValue ?? 0
-                let safeIndex = index < chapters.count ? index : 0
-                let rawContent = try await chapterContent!(newUrl, safeIndex)
+                CacheManager.shared.cacheChapters(bookUrl: newUrl, chapters: chapters)
+                CacheManager.shared.setCachedTotal(newUrl, total: chapters.count)
+                let currentIndex = readModel.recordModel.chapterModel.id?.intValue ?? 0
+                let safeIndex = currentIndex < chapters.count ? currentIndex : 0
+                let rawContent = try await NetworkService.shared.getBookContent(bookUrl: newUrl, index: safeIndex)
                 let content = DZMReadParser.contentTypesetting(content: rawContent)
+                CacheManager.shared.cacheChapter(bookUrl: newUrl, index: safeIndex, content: rawContent)
+                let newBook = Book(bookUrl: newUrl, name: bookName, author: author,
+                                   coverUrl: m.coverUrl, origin: m.origin, originName: m.originName,
+                                   intro: m.intro, latestChapterTitle: m.latestChapterTitle,
+                                   type: m.type, tocUrl: m.tocUrl)
+                try? await NetworkService.shared.saveBook(newBook)
+                if var cached = CacheManager.shared.getCachedBookshelf() {
+                    if let idx = cached.firstIndex(where: { $0.bookUrl == readModel.bookID }) {
+                        cached[idx] = newBook
+                        CacheManager.shared.cacheBookshelf(cached)
+                    }
+                }
                 readModel.bookID = newUrl
                 readModel.chapterListModels.removeAll()
                 for (i, ch) in chapters.enumerated() {
