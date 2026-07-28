@@ -275,7 +275,16 @@ class ShelfViewController: UIViewController {
     @objc func loadBooks() {
         Task {
             do {
-                let books = try await NetworkService.shared.getBookshelf()
+                var books = try await NetworkService.shared.getBookshelf()
+                let cached = CacheManager.shared.getCachedBookshelf() ?? []
+                books = books.map { server in
+                    guard let c = cached.first(where: { $0.bookUrl == server.bookUrl }),
+                          let localTime = c.durChapterTime else { return server }
+                    if (server.durChapterTime ?? 0) < localTime {
+                        return server.withProgress(index: c.durChapterIndex ?? 0, title: c.durChapterTitle, time: localTime)
+                    }
+                    return server
+                }
                 CacheManager.shared.cacheBookshelf(books)
                 await MainActor.run {
                     self.books = books
@@ -292,6 +301,40 @@ class ShelfViewController: UIViewController {
                     }
                 }
                 await MainActor.run { self.updateNetworkBar() }
+            }
+        }
+    }
+
+    @objc private func refreshBooks() {
+        Task {
+            do {
+                var books = try await NetworkService.shared.getBookshelf(refresh: true)
+                let cached = CacheManager.shared.getCachedBookshelf() ?? []
+                books = books.map { server in
+                    guard let c = cached.first(where: { $0.bookUrl == server.bookUrl }),
+                          let localTime = c.durChapterTime else { return server }
+                    if (server.durChapterTime ?? 0) < localTime {
+                        return server.withProgress(index: c.durChapterIndex ?? 0, title: c.durChapterTitle, time: localTime)
+                    }
+                    return server
+                }
+                CacheManager.shared.cacheBookshelf(books)
+                await MainActor.run {
+                    self.books = books
+                    self.cacheManageVC?.updateBooks(books)
+                    self.collectionView.reloadData()
+                    self.refreshControl.endRefreshing()
+                    self.updateNetworkBar()
+                }
+            } catch {
+                if let cached = CacheManager.shared.getCachedBookshelf() {
+                    await MainActor.run {
+                        self.books = cached
+                        self.cacheManageVC?.updateBooks(cached)
+                        self.collectionView.reloadData()
+                    }
+                }
+                await MainActor.run { self.refreshControl.endRefreshing() }
             }
         }
     }

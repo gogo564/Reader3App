@@ -78,19 +78,23 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         let bookUrl = readModel.bookID ?? ""
         let index = chapterID.intValue
         let title = rm.chapterName ?? ""
+        let bookName = readModel.bookName ?? ""
         let time = Int64(Date().timeIntervalSince1970 * 1000)
 
-        CacheManager.shared.updateBookProgress(bookUrl: bookUrl, index: index, title: title, time: time)
+        CacheManager.shared.updateBookProgress(bookUrl: bookUrl, bookName: bookName, index: index, chapterTitle: title, time: time)
 
         if NetworkMonitor.shared.isConnected {
             Task {
-                if var book = CacheManager.shared.findCachedBook(bookUrl: bookUrl) {
-                    book = book.withProgress(index: index, title: title, time: time)
+                if let cached = CacheManager.shared.findCachedBook(bookUrl: bookUrl) {
+                    var book = cached.withProgress(index: index, title: title, time: time)
+                    _ = try? await NetworkService.shared.saveBook(book)
+                } else {
+                    let book = Book(bookUrl: bookUrl, name: bookName, author: nil, durChapterTitle: title, durChapterIndex: index, durChapterTime: time)
                     _ = try? await NetworkService.shared.saveBook(book)
                 }
             }
         } else {
-            let payload = (try? JSONSerialization.data(withJSONObject: ["bookUrl": bookUrl, "durChapterIndex": index, "durChapterTitle": title, "durChapterTime": time])) ?? Data()
+            let payload = (try? JSONSerialization.data(withJSONObject: ["bookUrl": bookUrl, "bookName": bookName, "durChapterIndex": index, "durChapterTitle": title, "durChapterTime": time])) ?? Data()
             SyncQueue.shared.enqueue(type: .saveProgress, bookUrl: bookUrl, payload: payload)
         }
     }

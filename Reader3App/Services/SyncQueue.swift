@@ -87,29 +87,23 @@ class SyncQueue: NSObject {
             do {
                 if op.type == .saveProgress,
                    let localDict = (try? JSONSerialization.jsonObject(with: op.payload)) as? [String: Any],
-                   let localTime = localDict["durChapterTime"] as? Int64,
                    let localIndex = localDict["durChapterIndex"] as? Int {
                     if let serverBook = serverBooks[op.bookUrl],
-                       let serverTime = serverBook.durChapterTime {
-                        if serverTime >= localTime {
-                            remaining.removeAll { $0.id == op.id }
-                            continue
-                        }
-                        if serverBook.durChapterIndex != localIndex {
-                            let conflict = ProgressConflict(
-                                opId: op.id, bookUrl: op.bookUrl,
-                                bookName: serverBook.name,
-                                localIndex: localIndex,
-                                localTitle: localDict["durChapterTitle"] as? String,
-                                localTime: localTime,
-                                serverIndex: serverBook.durChapterIndex ?? 0,
-                                serverTitle: serverBook.durChapterTitle,
-                                serverTime: serverTime
-                            )
-                            newConflicts.append(conflict)
-                            remaining.removeAll { $0.id == op.id }
-                            continue
-                        }
+                       let serverIndex = serverBook.durChapterIndex,
+                       serverIndex != localIndex {
+                        let conflict = ProgressConflict(
+                            opId: op.id, bookUrl: op.bookUrl,
+                            bookName: serverBook.name,
+                            localIndex: localIndex,
+                            localTitle: localDict["durChapterTitle"] as? String,
+                            localTime: localDict["durChapterTime"] as? Int64 ?? 0,
+                            serverIndex: serverIndex,
+                            serverTitle: serverBook.durChapterTitle,
+                            serverTime: serverBook.durChapterTime ?? 0
+                        )
+                        newConflicts.append(conflict)
+                        remaining.removeAll { $0.id == op.id }
+                        continue
                     }
                 }
                 try await execute(op)
@@ -157,8 +151,9 @@ class SyncQueue: NSObject {
                   let url = dict["bookUrl"] as? String,
                   let index = dict["durChapterIndex"] as? Int else { return }
             let title = dict["durChapterTitle"] as? String
+            let bookName = dict["bookName"] as? String
             let time = dict["durChapterTime"] as? Int64 ?? Int64(Date().timeIntervalSince1970 * 1000)
-            try await NetworkService.shared.saveBookProgress(bookUrl: url, index: index, title: title, time: time)
+            try await NetworkService.shared.saveBookProgress(bookUrl: url, index: index, title: title, bookName: bookName, time: time)
         case .saveBookmark:
             let item = try JSONDecoder().decode(BookmarkItem.self, from: op.payload)
             try await NetworkService.shared.saveBookmark(item)
