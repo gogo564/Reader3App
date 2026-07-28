@@ -177,10 +177,56 @@ class ShelfViewController: UIViewController {
     }
 
     @objc private func toggleOffline() {
+        if offlineMode && !AppState.shared.isLoggedIn {
+            let alert = UIAlertController(title: "切换在线", message: "需要登录才能切换为在线模式", preferredStyle: .alert)
+            alert.addTextField { $0.placeholder = "用户名"; $0.text = UserDefaults.standard.string(forKey: "username") }
+            alert.addTextField { $0.placeholder = "密码"; $0.isSecureTextEntry = true }
+            alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in
+                self.offlineMode = true
+                self.updateRightBarButton()
+                self.collectionView.reloadData()
+            })
+            alert.addAction(UIAlertAction(title: "登录", style: .default) { [weak self] _ in
+                guard let self = self else { return }
+                let username = alert.textFields?[0].text?.trimmingCharacters(in: .whitespaces) ?? ""
+                let password = alert.textFields?[1].text ?? ""
+                guard !username.isEmpty, !password.isEmpty else { return }
+                let addr = AppState.shared.serverURL
+                guard !addr.isEmpty else { return }
+                AppState.shared.serverURL = addr
+                Task {
+                    do {
+                        try await NetworkService.shared.login(username: username, password: password)
+                        await MainActor.run {
+                            UserDefaults.standard.set(username, forKey: "username")
+                            AppState.shared.isLoggedIn = true
+                            AppState.shared.isConnected = true
+                            self.offlineMode = false
+                            self.updateRightBarButton()
+                            self.collectionView.reloadData()
+                            self.updateNetworkBar()
+                            self.loadBooks()
+                        }
+                    } catch {
+                        await MainActor.run {
+                            let errAlert = UIAlertController(title: "登录失败", message: error.localizedDescription, preferredStyle: .alert)
+                            errAlert.addAction(UIAlertAction(title: "确定", style: .default))
+                            self.present(errAlert, animated: true)
+                            self.offlineMode = true
+                            self.updateRightBarButton()
+                            self.collectionView.reloadData()
+                        }
+                    }
+                }
+            })
+            present(alert, animated: true)
+            return
+        }
         offlineMode.toggle()
         updateRightBarButton()
         collectionView.reloadData()
         updateNetworkBar()
+        if !offlineMode { loadBooks() }
     }
 
     @objc private func showCacheManage() {
