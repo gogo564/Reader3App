@@ -70,7 +70,7 @@ class ServerManager: ObservableObject {
         var req = URLRequest(url: requestURL, timeoutInterval: 15)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body = ["username": username, "password": password, "isLogin": true]
+        let body: [String: Any] = ["username": username, "password": password, "isLogin": true]
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, resp) = try await URLSession.shared.data(for: req)

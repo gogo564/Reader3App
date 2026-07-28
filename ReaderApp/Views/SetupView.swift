@@ -126,7 +126,7 @@ struct SetupView: View {
                 var req = URLRequest(url: url, timeoutInterval: 15)
                 req.httpMethod = "POST"
                 req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                let body = ["username": username, "password": password, "isLogin": false]
+                let body: [String: Any] = ["username": username, "password": password, "isLogin": false]
                 req.httpBody = try JSONSerialization.data(withJSONObject: body)
                 let (data, _) = try await URLSession.shared.data(for: req)
                 struct RegResponse: Codable { let isSuccess: Bool; let errorMsg: String? }
@@ -145,6 +145,14 @@ struct SetupView: View {
                     isLoggingIn = false
                 }
             }
+        }
+    }
+}
+
+extension View {
+    func placeholder<Content: View>(when shouldShow: Bool, @ViewBuilder content: () -> Content) -> some View {
+        overlay(alignment: .leading) {
+            if shouldShow { content() }
         }
     }
 }
