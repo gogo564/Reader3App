@@ -19,6 +19,7 @@ class SetupViewController: UIViewController {
             urlField.text = saved
             let savedUser = UserDefaults.standard.string(forKey: "username") ?? ""
             userField.text = savedUser
+            offlineButton.isHidden = false
         }
     }
 
