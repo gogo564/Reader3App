@@ -151,12 +151,13 @@ class NetworkService {
         return url
     }
 
-    private var session: URLSession {
+    private let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.httpCookieStorage = HTTPCookieStorage.shared
+        config.httpCookieAcceptPolicy = .always
         config.httpShouldSetCookies = true
         return URLSession(configuration: config)
-    }
+    }()
 
     private func get(_ path: String, query: [String: String]? = nil) async throws -> Data {
         let url = try buildURL(path, query: query)
