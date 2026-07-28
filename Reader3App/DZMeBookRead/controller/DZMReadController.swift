@@ -372,47 +372,12 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
             }
             let bookName = readModel.bookName ?? ""
             let author = bookAuthor
-            await MainActor.run { self.toast("正在搜索可用书源...") }
-            typealias Match = (source: BookSource, elapsed: TimeInterval)
-            var matches: [Match] = []
-            await withTaskGroup(of: Match?.self) { group in
-                for src in sources {
-                    guard let srcUrl = src.bookSourceUrl, !srcUrl.isEmpty else { continue }
-                    group.addTask {
-                        let t0 = CFAbsoluteTimeGetCurrent()
-                        guard let results = try? await NetworkService.shared.searchOnSource(bookName: bookName, sourceUrl: srcUrl) else { return nil }
-                        let elapsed = CFAbsoluteTimeGetCurrent() - t0
-                        for r in results {
-                            guard r.name == bookName else { continue }
-                            if let a = author, !a.isEmpty, r.author != a { continue }
-                            return (src, elapsed)
-                        }
-                        return nil
-                    }
-                }
-                for await m in group {
-                    if let m = m { matches.append(m) }
-                }
-            }
-            matches.sort { $0.elapsed < $1.elapsed }
-            guard !matches.isEmpty else {
-                await MainActor.run { self.toast("未找到可用书源") }
-                return
-            }
             await MainActor.run {
-                let alert = UIAlertController(title: "选择书源（共\(matches.count)个可用）", message: nil, preferredStyle: .actionSheet)
-                for (src, _) in matches {
-                    guard let name = src.bookSourceName, !name.isEmpty else { continue }
-                    alert.addAction(UIAlertAction(title: name, style: .default) { [weak self] _ in
-                        self?.switchToSource(src)
-                    })
+                let picker = SourcePickerViewController(sources: sources, bookName: bookName, author: author) { [weak self] src in
+                    self?.switchToSource(src)
                 }
-                alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-                if let popover = alert.popoverPresentationController {
-                    popover.sourceView = readMenu.bottomView
-                    popover.sourceRect = readMenu.bottomView.bounds
-                }
-                present(alert, animated: true)
+                picker.modalPresentationStyle = .overFullScreen
+                present(picker, animated: false)
             }
         }
     }
