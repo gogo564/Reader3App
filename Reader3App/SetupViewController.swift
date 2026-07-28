@@ -145,8 +145,6 @@ class SetupViewController: UIViewController {
         ])
     }
 
-    private let connectButton = UIButton(type: .system)
-
     private func setupOfflineButton() {
         offlineButton.setTitle("离线阅读 (仅缓存书籍)", for: .normal)
         offlineButton.titleLabel?.font = .systemFont(ofSize: 15)
@@ -185,13 +183,13 @@ class SetupViewController: UIViewController {
             addr = "http://" + addr
         }
 
+        AppState.shared.serverURL = addr
         Task {
             do {
                 try await NetworkService.shared.login(username: username, password: password)
                 await MainActor.run {
                     UserDefaults.standard.set(addr, forKey: "serverURL")
                     UserDefaults.standard.set(username, forKey: "username")
-                    AppState.shared.serverURL = addr
                     AppState.shared.isConnected = true
                     AppState.shared.isLoggedIn = true
                     loading.stopAnimating()
@@ -235,6 +233,7 @@ class SetupViewController: UIViewController {
             addr = "http://" + addr
         }
 
+        AppState.shared.serverURL = addr
         Task {
             do {
                 _ = try await NetworkService.shared.login(username: username, password: password, isLogin: false)
