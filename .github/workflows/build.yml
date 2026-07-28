@@ -10,6 +10,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+        with:
+          clean: true
 
       - name: Install XcodeGen
         run: brew install xcodegen 2>&1 | tail -3
