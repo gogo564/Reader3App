@@ -113,13 +113,9 @@ class CacheManager {
     func updateBookProgress(bookUrl: String, index: Int, title: String?, time: Int64) {
         var books = getCachedBookshelf() ?? []
         if let idx = books.firstIndex(where: { $0.bookUrl == bookUrl }) {
-            let old = books[idx]
-            books[idx] = old.withProgress(index: index, title: title, time: time)
-        } else {
-            let b = Book(bookUrl: bookUrl, name: title ?? "", author: nil, durChapterTitle: title, durChapterIndex: index, durChapterTime: time)
-            books.append(b)
+            books[idx] = books[idx].withProgress(index: index, title: title, time: time)
+            cacheBookshelf(books)
         }
-        cacheBookshelf(books)
     }
 
     func findCachedBook(bookUrl: String) -> Book? {

@@ -231,6 +231,11 @@ class ShelfViewController: UIViewController {
         Task {
             do {
                 _ = try await NetworkService.shared.saveBook(book)
+                var cached = CacheManager.shared.getCachedBookshelf() ?? []
+                if !cached.contains(where: { $0.bookUrl == book.bookUrl }) {
+                    cached.append(book)
+                    CacheManager.shared.cacheBookshelf(cached)
+                }
                 await MainActor.run { openBook(book) }
             } catch {}
         }
