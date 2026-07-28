@@ -11,22 +11,6 @@ struct SyncOperation: Codable {
     let payload: Data
 }
 
-struct ProgressConflict: Codable {
-    let opId: String
-    let bookUrl: String
-    let bookName: String?
-    let localIndex: Int
-    let localTitle: String?
-    let localTime: Int64
-    let serverIndex: Int
-    let serverTitle: String?
-    let serverTime: Int64
-}
-
-extension Notification.Name {
-    static let conflictsDidChange = Notification.Name("conflictsDidChange")
-}
-
 class SyncQueue: NSObject {
     static let shared = SyncQueue()
     private override init() {}
@@ -47,23 +31,6 @@ class SyncQueue: NSObject {
 
     var pendingCount: Int { queue.count }
 
-    private var conflictStore: [ProgressConflict] {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: "sync_conflicts"),
-                  let c = try? JSONDecoder().decode([ProgressConflict].self, from: data)
-            else { return [] }
-            return c
-        }
-        set {
-            if let data = try? JSONEncoder().encode(newValue) {
-                UserDefaults.standard.set(data, forKey: "sync_conflicts")
-            }
-        }
-    }
-
-    var conflictCount: Int { conflictStore.count }
-    var conflicts: [ProgressConflict] { conflictStore }
-
     func enqueue(type: SyncOpType, bookUrl: String, payload: Data) {
         let op = SyncOperation(id: UUID().uuidString, type: type, bookUrl: bookUrl, payload: payload)
         var q = queue
@@ -76,36 +43,9 @@ class SyncQueue: NSObject {
         let ops = queue
         guard !ops.isEmpty else { return }
 
-        var serverBooks: [String: Book] = [:]
-        if let books = try? await NetworkService.shared.getBookshelf() {
-            for b in books { serverBooks[b.bookUrl] = b }
-        }
-
         var remaining = ops
-        var newConflicts = conflictStore
         for op in ops {
             do {
-                if op.type == .saveProgress,
-                   let localDict = (try? JSONSerialization.jsonObject(with: op.payload)) as? [String: Any],
-                   let localIndex = localDict["durChapterIndex"] as? Int {
-                    if let serverBook = serverBooks[op.bookUrl],
-                       let serverIndex = serverBook.durChapterIndex,
-                       serverIndex != localIndex {
-                        let conflict = ProgressConflict(
-                            opId: op.id, bookUrl: op.bookUrl,
-                            bookName: serverBook.name,
-                            localIndex: localIndex,
-                            localTitle: localDict["durChapterTitle"] as? String,
-                            localTime: localDict["durChapterTime"] as? Int64 ?? 0,
-                            serverIndex: serverIndex,
-                            serverTitle: serverBook.durChapterTitle,
-                            serverTime: serverBook.durChapterTime ?? 0
-                        )
-                        newConflicts.append(conflict)
-                        remaining.removeAll { $0.id == op.id }
-                        continue
-                    }
-                }
                 try await execute(op)
                 remaining.removeAll { $0.id == op.id }
             } catch {
@@ -113,52 +53,6 @@ class SyncQueue: NSObject {
             }
         }
         queue = remaining
-        conflictStore = newConflicts
-        if !newConflicts.isEmpty {
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .conflictsDidChange, object: nil)
-            }
-        }
-    }
-
-    func resolveConflict(opId: String, useLocal: Bool) async {
-        var c = conflictStore
-        guard let idx = c.firstIndex(where: { $0.opId == opId }) else { return }
-        let conflict = c.remove(at: idx)
-        conflictStore = c
-
-        // 移除该书的待同步进度 op，避免重复冲突
-        var q = queue
-        q.removeAll { $0.bookUrl == conflict.bookUrl && $0.type == .saveProgress }
-        queue = q
-
-        if useLocal {
-            do {
-                try await NetworkService.shared.saveBookProgress(
-                    bookUrl: conflict.bookUrl,
-                    index: conflict.localIndex,
-                    title: conflict.localTitle,
-                    bookName: conflict.bookName,
-                    time: conflict.localTime
-                )
-            } catch {
-                // 直接写入失败时回退到队列
-                let dict: [String: Any] = [
-                    "bookUrl": conflict.bookUrl,
-                    "durChapterIndex": conflict.localIndex,
-                    "durChapterTitle": conflict.localTitle ?? "",
-                    "durChapterTime": conflict.localTime
-                ]
-                if let payload = try? JSONSerialization.data(withJSONObject: dict) {
-                    let op = SyncOperation(id: UUID().uuidString, type: .saveProgress, bookUrl: conflict.bookUrl, payload: payload)
-                    q = queue
-                    q.append(op)
-                    queue = q
-                }
-            }
-        }
-        // 处理队列中剩余的 op（不含已解决的冲突书籍）
-        await processAll()
     }
 
     private func execute(_ op: SyncOperation) async throws {
@@ -194,6 +88,5 @@ class SyncQueue: NSObject {
 
     func clear() {
         queue = []
-        conflictStore = []
     }
 }

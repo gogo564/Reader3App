@@ -27,38 +27,15 @@ class ShelfViewController: UIViewController {
         loadBooks()
         NotificationCenter.default.addObserver(self, selector: #selector(loadBooks), name: UIApplication.willEnterForegroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(networkChanged), name: .networkStatusChanged, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(checkConflicts), name: .conflictsDidChange, object: nil)
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         loadBooks()
-        checkConflicts()
     }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
-    }
-
-    @objc private func checkConflicts() {
-        guard SyncQueue.shared.conflictCount > 0 else { return }
-        let conflicts = SyncQueue.shared.conflicts
-        for c in conflicts {
-            showConflictAlert(c)
-        }
-    }
-
-    private func showConflictAlert(_ c: ProgressConflict) {
-        let name = c.bookName ?? "未知书籍"
-        let msg = "「\(name)」进度冲突\n本地：第\(c.localIndex+1)章 \(c.localTitle ?? "")\n服务器：第\(c.serverIndex+1)章 \(c.serverTitle ?? "")\n\n选择保留哪个？"
-        let alert = UIAlertController(title: "进度冲突", message: msg, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "保留本地", style: .default) { _ in
-            Task { await SyncQueue.shared.resolveConflict(opId: c.opId, useLocal: true) }
-        })
-        alert.addAction(UIAlertAction(title: "保留服务器", style: .default) { _ in
-            Task { await SyncQueue.shared.resolveConflict(opId: c.opId, useLocal: false) }
-        })
-        present(alert, animated: true)
     }
 
     @objc private func networkChanged() {
@@ -73,11 +50,7 @@ class ShelfViewController: UIViewController {
         networkLabel.text = online ? "在线" : "离线"
         networkLabel.textColor = online ? .darkText : .systemRed
         let pending = SyncQueue.shared.pendingCount
-        let conflicts = SyncQueue.shared.conflictCount
-        if conflicts > 0 {
-            pendingLabel.text = "\(conflicts) 个进度冲突 ⚠️"
-            pendingLabel.textColor = .systemRed
-        } else if pending > 0 {
+        if pending > 0 {
             pendingLabel.text = "待同步 \(pending)"
             pendingLabel.textColor = .systemOrange
         } else {
