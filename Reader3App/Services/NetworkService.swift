@@ -105,6 +105,46 @@ class NetworkService {
         throw APIError.apiError("获取内容超时，请稍后重试")
     }
 
+    // MARK: - Auto Source Switch
+
+    func searchOnSource(bookName: String, sourceUrl: String) async throws -> [SearchResult] {
+        let body = try JSONSerialization.data(withJSONObject: [
+            "key": bookName,
+            "bookSourceUrl": sourceUrl,
+            "concurrentCount": 1,
+            "page": 1,
+            "lastIndex": -1
+        ] as [String: Any])
+        let data = try await post("/searchBook", body: body, timeout: 30)
+        let resp = try JSONDecoder().decode(APIResponse<SearchMultiResponse>.self, from: data)
+        guard resp.isSuccess, let result = resp.data else {
+            throw APIError.apiError(resp.errorMsg ?? "搜索失败")
+        }
+        return result.list
+    }
+
+    func autoSwitchSource(for book: Book) async throws -> Book? {
+        let sources = try await getBookSources()
+        let currentOrigin = book.origin ?? ""
+        for src in sources {
+            guard let srcUrl = src.bookSourceUrl, !srcUrl.isEmpty else { continue }
+            if srcUrl == currentOrigin { continue }
+            guard let results = try? await searchOnSource(bookName: book.name, sourceUrl: srcUrl) else { continue }
+            for r in results {
+                guard r.name == book.name else { continue }
+                if let author = book.author, !author.isEmpty, r.author != author { continue }
+                return Book(bookUrl: r.bookUrl, name: r.name, author: r.author,
+                            coverUrl: r.coverUrl, origin: r.origin, originName: r.originName,
+                            intro: r.intro, latestChapterTitle: r.latestChapterTitle,
+                            durChapterTitle: book.durChapterTitle,
+                            durChapterIndex: book.durChapterIndex,
+                            durChapterTime: book.durChapterTime,
+                            type: r.type, tocUrl: r.tocUrl)
+            }
+        }
+        return nil
+    }
+
     func saveBookProgress(bookUrl: String, index: Int, title: String? = nil, bookName: String? = nil, time: Int64) async throws {
         var book = CacheManager.shared.findCachedBook(bookUrl: bookUrl)
         if book == nil {

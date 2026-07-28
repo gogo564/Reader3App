@@ -344,112 +344,132 @@ class ShelfViewController: UIViewController {
             return try await NetworkService.shared.getBookContent(bookUrl: bookUrl, index: index)
         }
 
-        Task {
-            do {
-                let chapters = try await readController.chapterList!(book.bookUrl)
-                readController.catalogChapters = chapters
-                let index = book.durChapterIndex ?? 0
-                let rawContent = try await readController.chapterContent!(book.bookUrl, index)
-                let content = DZMReadParser.contentTypesetting(content: rawContent)
+        func tryOpen(currentBook: Book, hasSwitched: Bool) {
+            Task {
+                do {
+                    let chapters = try await readController.chapterList!(currentBook.bookUrl)
+                    readController.catalogChapters = chapters
+                    let index = currentBook.durChapterIndex ?? 0
+                    let rawContent = try await readController.chapterContent!(currentBook.bookUrl, index)
+                    let content = DZMReadParser.contentTypesetting(content: rawContent)
 
-                let recordModel = DZMReadRecordModel()
-                recordModel.bookID = book.bookUrl
-                let chapterModel = DZMReadChapterModel()
-                chapterModel.bookID = book.bookUrl
-                chapterModel.id = NSNumber(value: index)
-                chapterModel.name = book.durChapterTitle ?? chapters[safe: index]?.title ?? "开始阅读"
-                chapterModel.content = content
-                chapterModel.priority = NSNumber(value: index)
-                if index > 0 { chapterModel.previousChapterID = NSNumber(value: index - 1) }
-                else { chapterModel.previousChapterID = DZM_READ_NO_MORE_CHAPTER }
-                if index < chapters.count - 1 { chapterModel.nextChapterID = NSNumber(value: index + 1) }
-                else { chapterModel.nextChapterID = DZM_READ_NO_MORE_CHAPTER }
-                chapterModel.updateFont()
-                recordModel.chapterModel = chapterModel
-                readModel.recordModel = recordModel
+                    readModel.bookID = currentBook.bookUrl
+                    let recordModel = DZMReadRecordModel()
+                    recordModel.bookID = currentBook.bookUrl
+                    let chapterModel = DZMReadChapterModel()
+                    chapterModel.bookID = currentBook.bookUrl
+                    chapterModel.id = NSNumber(value: index)
+                    chapterModel.name = currentBook.durChapterTitle ?? chapters[safe: index]?.title ?? "开始阅读"
+                    chapterModel.content = content
+                    chapterModel.priority = NSNumber(value: index)
+                    if index > 0 { chapterModel.previousChapterID = NSNumber(value: index - 1) }
+                    else { chapterModel.previousChapterID = DZM_READ_NO_MORE_CHAPTER }
+                    if index < chapters.count - 1 { chapterModel.nextChapterID = NSNumber(value: index + 1) }
+                    else { chapterModel.nextChapterID = DZM_READ_NO_MORE_CHAPTER }
+                    chapterModel.updateFont()
+                    recordModel.chapterModel = chapterModel
+                    readModel.recordModel = recordModel
 
-                for (i, ch) in chapters.enumerated() {
-                    let lm = DZMReadChapterListModel()
-                    lm.id = NSNumber(value: i)
-                    lm.name = ch.title
-                    lm.bookID = book.bookUrl
-                    readModel.chapterListModels.append(lm)
-                }
-
-                await MainActor.run {
-                    readController.readModel = readModel
-                    navigationController?.pushViewController(readController, animated: true)
-                }
-
-                prefetchNextChapters(book: book, from: index + 1)
-            } catch {
-                await MainActor.run {
-                    if let chapters = self.chapterListCache(bookUrl: book.bookUrl),
-                       let rawContent = self.cachedContent(bookUrl: book.bookUrl, index: book.durChapterIndex ?? 0) {
-                        let index = book.durChapterIndex ?? 0
-                        readController.catalogChapters = chapters
-                        for (i, ch) in chapters.enumerated() {
-                            let lm = DZMReadChapterListModel()
-                            lm.id = NSNumber(value: i)
-                            lm.name = ch.title
-                            lm.bookID = book.bookUrl
-                            readModel.chapterListModels.append(lm)
-                        }
-                        let cm = DZMReadChapterModel()
-                        cm.bookID = book.bookUrl
-                        cm.id = NSNumber(value: index)
-                        cm.name = book.durChapterTitle ?? chapters.first?.title ?? "开始阅读"
-                        cm.content = DZMReadParser.contentTypesetting(content: rawContent)
-                        cm.priority = NSNumber(value: index)
-                        if index > 0 { cm.previousChapterID = NSNumber(value: index - 1) }
-                        else { cm.previousChapterID = DZM_READ_NO_MORE_CHAPTER }
-                        if index < chapters.count - 1 { cm.nextChapterID = NSNumber(value: index + 1) }
-                        else { cm.nextChapterID = DZM_READ_NO_MORE_CHAPTER }
-                        cm.updateFont()
-                        let rm = DZMReadRecordModel()
-                        rm.bookID = book.bookUrl
-                        rm.chapterModel = cm
-                        readModel.recordModel = rm
-                        readController.readModel = readModel
-                        navigationController?.pushViewController(readController, animated: true)
-                        return
-                    }
-                    if let cached = self.cachedContent(bookUrl: book.bookUrl, index: book.durChapterIndex ?? 0) {
-                        readModel.chapterListModels = []
+                    readModel.chapterListModels.removeAll()
+                    for (i, ch) in chapters.enumerated() {
                         let lm = DZMReadChapterListModel()
-                        lm.id = NSNumber(value: book.durChapterIndex ?? 0)
-                        lm.name = book.durChapterTitle ?? "开始阅读"
-                        lm.bookID = book.bookUrl
+                        lm.id = NSNumber(value: i)
+                        lm.name = ch.title
+                        lm.bookID = currentBook.bookUrl
                         readModel.chapterListModels.append(lm)
-                        let cm = DZMReadChapterModel()
-                        cm.bookID = book.bookUrl
-                        cm.id = NSNumber(value: book.durChapterIndex ?? 0)
-                        cm.name = book.durChapterTitle ?? "开始阅读"
-                        cm.content = DZMReadParser.contentTypesetting(content: cached)
-                        cm.priority = NSNumber(value: book.durChapterIndex ?? 0)
-                        cm.previousChapterID = DZM_READ_NO_MORE_CHAPTER
-                        cm.nextChapterID = DZM_READ_NO_MORE_CHAPTER
-                        cm.updateFont()
-                        let rm = DZMReadRecordModel()
-                        rm.bookID = book.bookUrl
-                        rm.chapterModel = cm
-                        readModel.recordModel = rm
+                    }
+
+                    await MainActor.run {
                         readController.readModel = readModel
                         navigationController?.pushViewController(readController, animated: true)
-                        return
                     }
-                    let msg: String
-                    if !NetworkMonitor.shared.isConnected {
-                        msg = "当前无网络连接，请联网后重试"
-                    } else {
-                        msg = error.localizedDescription
+
+                    prefetchNextChapters(book: currentBook, from: index + 1)
+                } catch {
+                    if !hasSwitched {
+                        if let newBook = try? await NetworkService.shared.autoSwitchSource(for: currentBook) {
+                            var cached = CacheManager.shared.getCachedBookshelf() ?? []
+                            if let idx = cached.firstIndex(where: { $0.name == currentBook.name }) {
+                                cached[idx] = newBook
+                                CacheManager.shared.cacheBookshelf(cached)
+                            }
+                            Task { try? await NetworkService.shared.saveBook(newBook) }
+                            await MainActor.run { self.books = cached; self.collectionView.reloadData() }
+                            tryOpen(currentBook: newBook, hasSwitched: true)
+                            return
+                        }
                     }
-                    let alert = UIAlertController(title: "加载失败", message: msg, preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "确定", style: .default))
-                    self.present(alert, animated: true)
+                    await MainActor.run {
+                        if let chapters = self.chapterListCache(bookUrl: currentBook.bookUrl),
+                           let rawContent = self.cachedContent(bookUrl: currentBook.bookUrl, index: currentBook.durChapterIndex ?? 0) {
+                            let index = currentBook.durChapterIndex ?? 0
+                            readController.catalogChapters = chapters
+                            readModel.chapterListModels.removeAll()
+                            for (i, ch) in chapters.enumerated() {
+                                let lm = DZMReadChapterListModel()
+                                lm.id = NSNumber(value: i)
+                                lm.name = ch.title
+                                lm.bookID = currentBook.bookUrl
+                                readModel.chapterListModels.append(lm)
+                            }
+                            let cm = DZMReadChapterModel()
+                            cm.bookID = currentBook.bookUrl
+                            cm.id = NSNumber(value: index)
+                            cm.name = currentBook.durChapterTitle ?? chapters.first?.title ?? "开始阅读"
+                            cm.content = DZMReadParser.contentTypesetting(content: rawContent)
+                            cm.priority = NSNumber(value: index)
+                            if index > 0 { cm.previousChapterID = NSNumber(value: index - 1) }
+                            else { cm.previousChapterID = DZM_READ_NO_MORE_CHAPTER }
+                            if index < chapters.count - 1 { cm.nextChapterID = NSNumber(value: index + 1) }
+                            else { cm.nextChapterID = DZM_READ_NO_MORE_CHAPTER }
+                            cm.updateFont()
+                            let rm = DZMReadRecordModel()
+                            rm.bookID = currentBook.bookUrl
+                            rm.chapterModel = cm
+                            readModel.recordModel = rm
+                            readController.readModel = readModel
+                            navigationController?.pushViewController(readController, animated: true)
+                            return
+                        }
+                        if let cached = self.cachedContent(bookUrl: currentBook.bookUrl, index: currentBook.durChapterIndex ?? 0) {
+                            readModel.chapterListModels.removeAll()
+                            let lm = DZMReadChapterListModel()
+                            lm.id = NSNumber(value: currentBook.durChapterIndex ?? 0)
+                            lm.name = currentBook.durChapterTitle ?? "开始阅读"
+                            lm.bookID = currentBook.bookUrl
+                            readModel.chapterListModels.append(lm)
+                            let cm = DZMReadChapterModel()
+                            cm.bookID = currentBook.bookUrl
+                            cm.id = NSNumber(value: currentBook.durChapterIndex ?? 0)
+                            cm.name = currentBook.durChapterTitle ?? "开始阅读"
+                            cm.content = DZMReadParser.contentTypesetting(content: cached)
+                            cm.priority = NSNumber(value: currentBook.durChapterIndex ?? 0)
+                            cm.previousChapterID = DZM_READ_NO_MORE_CHAPTER
+                            cm.nextChapterID = DZM_READ_NO_MORE_CHAPTER
+                            cm.updateFont()
+                            let rm = DZMReadRecordModel()
+                            rm.bookID = currentBook.bookUrl
+                            rm.chapterModel = cm
+                            readModel.recordModel = rm
+                            readController.readModel = readModel
+                            navigationController?.pushViewController(readController, animated: true)
+                            return
+                        }
+                        let msg: String
+                        if !NetworkMonitor.shared.isConnected {
+                            msg = "当前无网络连接，请联网后重试"
+                        } else {
+                            msg = error.localizedDescription
+                        }
+                        let alert = UIAlertController(title: "加载失败", message: msg, preferredStyle: .alert)
+                        alert.addAction(UIAlertAction(title: "确定", style: .default))
+                        self.present(alert, animated: true)
+                    }
                 }
             }
         }
+
+        tryOpen(currentBook: book, hasSwitched: false)
     }
 
     private func prefetchNextChapters(book: Book, from index: Int) {
