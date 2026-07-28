@@ -286,6 +286,7 @@ class ShelfViewController: UIViewController {
                     return server
                 }
                 CacheManager.shared.cacheBookshelf(books)
+                await AppState.shared.syncPendingDeletes()
                 await MainActor.run {
                     self.books = books
                     self.cacheManageVC?.updateBooks(books)
@@ -319,6 +320,7 @@ class ShelfViewController: UIViewController {
                     return server
                 }
                 CacheManager.shared.cacheBookshelf(books)
+                await AppState.shared.syncPendingDeletes()
                 await MainActor.run {
                     self.books = books
                     self.cacheManageVC?.updateBooks(books)
@@ -344,19 +346,13 @@ class ShelfViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
             guard let self = self else { return }
+            self.books.removeAll { $0.bookUrl == book.bookUrl }
+            self.collectionView.reloadData()
             Task {
                 do {
                     try await NetworkService.shared.deleteBook(bookUrl: book.bookUrl)
-                    await MainActor.run {
-                        self.books.removeAll { $0.bookUrl == book.bookUrl }
-                        self.collectionView.reloadData()
-                    }
                 } catch {
-                    await MainActor.run {
-                        let errAlert = UIAlertController(title: "删除失败", message: error.localizedDescription, preferredStyle: .alert)
-                        errAlert.addAction(UIAlertAction(title: "确定", style: .default))
-                        self.present(errAlert, animated: true)
-                    }
+                    AppState.shared.addPendingDelete(bookUrl: book.bookUrl)
                 }
             }
         })
