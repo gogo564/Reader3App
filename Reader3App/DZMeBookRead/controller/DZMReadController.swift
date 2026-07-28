@@ -370,19 +370,21 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                 await MainActor.run { self.toast("获取书源失败") }
                 return
             }
-            let alert = UIAlertController(title: "选择书源", message: nil, preferredStyle: .actionSheet)
-            for src in sources {
-                guard let name = src.bookSourceName, !name.isEmpty else { continue }
-                alert.addAction(UIAlertAction(title: name, style: .default) { [weak self] _ in
-                    self?.switchToSource(src)
-                })
+            await MainActor.run {
+                let alert = UIAlertController(title: "选择书源", message: nil, preferredStyle: .actionSheet)
+                for src in sources {
+                    guard let name = src.bookSourceName, !name.isEmpty else { continue }
+                    alert.addAction(UIAlertAction(title: name, style: .default) { [weak self] _ in
+                        self?.switchToSource(src)
+                    })
+                }
+                alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+                if let popover = alert.popoverPresentationController {
+                    popover.sourceView = readMenu.bottomView
+                    popover.sourceRect = readMenu.bottomView.bounds
+                }
+                present(alert, animated: true)
             }
-            alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-            if let popover = alert.popoverPresentationController {
-                popover.sourceView = readMenu.bottomView
-                popover.sourceRect = readMenu.bottomView.bounds
-            }
-            await MainActor.run { present(alert, animated: true) }
         }
     }
 
@@ -393,6 +395,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         }
         let bookName = readModel.bookName ?? ""
         let author = bookAuthor
+        let currentIndex = readModel.recordModel.chapterModel.id?.intValue ?? 0
         Task { [weak self] in
             guard let self = self else { return }
             do {
@@ -415,23 +418,16 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                     return
                 }
                 let chapters = try await NetworkService.shared.getChapterList(bookUrl: newUrl, bookSourceUrl: srcUrl)
-                let safeIndex: Int
-                let content: String
-                let newBook: Book
-                (safeIndex, content, newBook) = try await {
-                    let currentIndex = readModel.recordModel.chapterModel.id?.intValue ?? 0
-                    let si = currentIndex < chapters.count ? currentIndex : 0
-                    let rawContent = try await NetworkService.shared.getBookContent(bookUrl: newUrl, index: si)
-                    let ct = DZMReadParser.contentTypesetting(content: rawContent)
-                    CacheManager.shared.cacheChapter(bookUrl: newUrl, index: si, content: rawContent)
-                    CacheManager.shared.cacheChapters(bookUrl: newUrl, chapters: chapters)
-                    CacheManager.shared.setCachedTotal(newUrl, total: chapters.count)
-                    let nb = Book(bookUrl: newUrl, name: bookName, author: author,
+                let safeIndex = currentIndex < chapters.count ? currentIndex : 0
+                let rawContent = try await NetworkService.shared.getBookContent(bookUrl: newUrl, index: safeIndex)
+                let content = DZMReadParser.contentTypesetting(content: rawContent)
+                CacheManager.shared.cacheChapter(bookUrl: newUrl, index: safeIndex, content: rawContent)
+                CacheManager.shared.cacheChapters(bookUrl: newUrl, chapters: chapters)
+                CacheManager.shared.setCachedTotal(newUrl, total: chapters.count)
+                let newBook = Book(bookUrl: newUrl, name: bookName, author: author,
                                   coverUrl: m.coverUrl, origin: m.origin, originName: m.originName,
                                   intro: m.intro, latestChapterTitle: m.latestChapterTitle,
                                   type: m.type, tocUrl: m.tocUrl)
-                    return (si, ct, nb)
-                }()
                 try? await NetworkService.shared.saveBook(newBook)
                 await MainActor.run {
                     if var cached = CacheManager.shared.getCachedBookshelf() {
