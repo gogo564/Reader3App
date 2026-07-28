@@ -72,11 +72,19 @@ class NetworkService {
         ] as [String: Any])
         let path = searchType == "single" ? "/searchBook" : "/searchBookMulti"
         let data = try await post(path, body: body, timeout: searchType == "single" ? 30 : 180)
-        let resp = try JSONDecoder().decode(APIResponse<SearchMultiResponse>.self, from: data)
-        guard resp.isSuccess, let result = resp.data else {
-            throw APIError.apiError(resp.errorMsg ?? "搜索失败")
+        if searchType == "single" {
+            let resp = try JSONDecoder().decode(APIResponse<[SearchResult]>.self, from: data)
+            guard resp.isSuccess, let result = resp.data else {
+                throw APIError.apiError(resp.errorMsg ?? "搜索失败")
+            }
+            return result
+        } else {
+            let resp = try JSONDecoder().decode(APIResponse<SearchMultiResponse>.self, from: data)
+            guard resp.isSuccess, let result = resp.data else {
+                throw APIError.apiError(resp.errorMsg ?? "搜索失败")
+            }
+            return result.list
         }
-        return result.list
     }
 
     // MARK: - Reading
@@ -116,11 +124,11 @@ class NetworkService {
             "lastIndex": -1
         ] as [String: Any])
         let data = try await post("/searchBook", body: body, timeout: 30)
-        let resp = try JSONDecoder().decode(APIResponse<SearchMultiResponse>.self, from: data)
+        let resp = try JSONDecoder().decode(APIResponse<[SearchResult]>.self, from: data)
         guard resp.isSuccess, let result = resp.data else {
             throw APIError.apiError(resp.errorMsg ?? "搜索失败")
         }
-        return result.list
+        return result
     }
 
     func autoSwitchSource(for book: Book) async throws -> Book? {
