@@ -364,7 +364,8 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     /// 点击换源
     func readMenuClickSwitchSource(readMenu: DZMReadMenu!) {
         readMenu.showMenu(isShow: false)
-        Task {
+        Task { [weak self] in
+            guard let self = self else { return }
             guard let sources = try? await NetworkService.shared.getBookSources(simple: true) else {
                 await MainActor.run { self.toast("获取书源失败") }
                 return
@@ -392,9 +393,10 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         }
         let bookName = readModel.bookName ?? ""
         let author = bookAuthor
-        toast("正在搜索...")
-        Task {
+        Task { [weak self] in
+            guard let self = self else { return }
             do {
+                await MainActor.run { self.toast("正在搜索...") }
                 let results = try await NetworkService.shared.searchOnSource(bookName: bookName, sourceUrl: srcUrl)
                 var match: SearchResult?
                 for r in results {
@@ -413,54 +415,60 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                     return
                 }
                 let chapters = try await NetworkService.shared.getChapterList(bookUrl: newUrl, bookSourceUrl: srcUrl)
-                catalogChapters = chapters
-                CacheManager.shared.cacheChapters(bookUrl: newUrl, chapters: chapters)
-                CacheManager.shared.setCachedTotal(newUrl, total: chapters.count)
-                let currentIndex = readModel.recordModel.chapterModel.id?.intValue ?? 0
-                let safeIndex = currentIndex < chapters.count ? currentIndex : 0
-                let rawContent = try await NetworkService.shared.getBookContent(bookUrl: newUrl, index: safeIndex)
-                let content = DZMReadParser.contentTypesetting(content: rawContent)
-                CacheManager.shared.cacheChapter(bookUrl: newUrl, index: safeIndex, content: rawContent)
-                let newBook = Book(bookUrl: newUrl, name: bookName, author: author,
-                                   coverUrl: m.coverUrl, origin: m.origin, originName: m.originName,
-                                   intro: m.intro, latestChapterTitle: m.latestChapterTitle,
-                                   type: m.type, tocUrl: m.tocUrl)
+                let safeIndex: Int
+                let content: String
+                let newBook: Book
+                (safeIndex, content, newBook) = try await {
+                    let currentIndex = readModel.recordModel.chapterModel.id?.intValue ?? 0
+                    let si = currentIndex < chapters.count ? currentIndex : 0
+                    let rawContent = try await NetworkService.shared.getBookContent(bookUrl: newUrl, index: si)
+                    let ct = DZMReadParser.contentTypesetting(content: rawContent)
+                    CacheManager.shared.cacheChapter(bookUrl: newUrl, index: si, content: rawContent)
+                    CacheManager.shared.cacheChapters(bookUrl: newUrl, chapters: chapters)
+                    CacheManager.shared.setCachedTotal(newUrl, total: chapters.count)
+                    let nb = Book(bookUrl: newUrl, name: bookName, author: author,
+                                  coverUrl: m.coverUrl, origin: m.origin, originName: m.originName,
+                                  intro: m.intro, latestChapterTitle: m.latestChapterTitle,
+                                  type: m.type, tocUrl: m.tocUrl)
+                    return (si, ct, nb)
+                }()
                 try? await NetworkService.shared.saveBook(newBook)
-                if var cached = CacheManager.shared.getCachedBookshelf() {
-                    if let idx = cached.firstIndex(where: { $0.bookUrl == readModel.bookID }) {
-                        cached[idx] = newBook
-                        CacheManager.shared.cacheBookshelf(cached)
-                    }
-                }
-                readModel.bookID = newUrl
-                readModel.chapterListModels.removeAll()
-                for (i, ch) in chapters.enumerated() {
-                    let lm = DZMReadChapterListModel()
-                    lm.id = NSNumber(value: i)
-                    lm.name = ch.title
-                    lm.bookID = newUrl
-                    readModel.chapterListModels.append(lm)
-                }
-                let cm = DZMReadChapterModel()
-                cm.bookID = newUrl
-                cm.id = NSNumber(value: safeIndex)
-                cm.name = chapters[safe: safeIndex]?.title ?? "开始阅读"
-                cm.content = content
-                cm.priority = NSNumber(value: safeIndex)
-                if safeIndex > 0 { cm.previousChapterID = NSNumber(value: safeIndex - 1) }
-                else { cm.previousChapterID = DZM_READ_NO_MORE_CHAPTER }
-                if safeIndex < chapters.count - 1 { cm.nextChapterID = NSNumber(value: safeIndex + 1) }
-                else { cm.nextChapterID = DZM_READ_NO_MORE_CHAPTER }
-                cm.updateFont()
-                let rm = DZMReadRecordModel()
-                rm.bookID = newUrl
-                rm.chapterModel = cm
-                readModel.recordModel = rm
                 await MainActor.run {
+                    if var cached = CacheManager.shared.getCachedBookshelf() {
+                        if let idx = cached.firstIndex(where: { $0.bookUrl == readModel.bookID }) {
+                            cached[idx] = newBook
+                            CacheManager.shared.cacheBookshelf(cached)
+                        }
+                    }
+                    catalogChapters = chapters
+                    readModel.bookID = newUrl
+                    readModel.chapterListModels.removeAll()
+                    for (i, ch) in chapters.enumerated() {
+                        let lm = DZMReadChapterListModel()
+                        lm.id = NSNumber(value: i)
+                        lm.name = ch.title
+                        lm.bookID = newUrl
+                        readModel.chapterListModels.append(lm)
+                    }
+                    let cm = DZMReadChapterModel()
+                    cm.bookID = newUrl
+                    cm.id = NSNumber(value: safeIndex)
+                    cm.name = chapters[safe: safeIndex]?.title ?? "开始阅读"
+                    cm.content = content
+                    cm.priority = NSNumber(value: safeIndex)
+                    if safeIndex > 0 { cm.previousChapterID = NSNumber(value: safeIndex - 1) }
+                    else { cm.previousChapterID = DZM_READ_NO_MORE_CHAPTER }
+                    if safeIndex < chapters.count - 1 { cm.nextChapterID = NSNumber(value: safeIndex + 1) }
+                    else { cm.nextChapterID = DZM_READ_NO_MORE_CHAPTER }
+                    cm.updateFont()
+                    let rm = DZMReadRecordModel()
+                    rm.bookID = newUrl
+                    rm.chapterModel = cm
+                    readModel.recordModel = rm
                     readMenu.topView.updateMarkButton()
                     readMenu.bottomView.progressView.reloadProgress()
                     creatPageController(displayController: GetCurrentReadViewController())
-                    toast("已切换到「\(source.bookSourceName ?? "新源")」")
+                    self.toast("已切换到「\(source.bookSourceName ?? "新源")」")
                 }
             } catch {
                 await MainActor.run { self.toast("换源失败: \(error.localizedDescription)") }
