@@ -11,6 +11,22 @@ struct SyncOperation: Codable {
     let payload: Data
 }
 
+struct ProgressConflict: Codable {
+    let opId: String
+    let bookUrl: String
+    let bookName: String?
+    let localIndex: Int
+    let localTitle: String?
+    let localTime: Int64
+    let serverIndex: Int
+    let serverTitle: String?
+    let serverTime: Int64
+}
+
+extension Notification.Name {
+    static let conflictsDidChange = Notification.Name("conflictsDidChange")
+}
+
 class SyncQueue: NSObject {
     static let shared = SyncQueue()
     private override init() {}
@@ -31,6 +47,23 @@ class SyncQueue: NSObject {
 
     var pendingCount: Int { queue.count }
 
+    private var conflictStore: [ProgressConflict] {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: "sync_conflicts"),
+                  let c = try? JSONDecoder().decode([ProgressConflict].self, from: data)
+            else { return [] }
+            return c
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                UserDefaults.standard.set(data, forKey: "sync_conflicts")
+            }
+        }
+    }
+
+    var conflictCount: Int { conflictStore.count }
+    var conflicts: [ProgressConflict] { conflictStore }
+
     func enqueue(type: SyncOpType, bookUrl: String, payload: Data) {
         let op = SyncOperation(id: UUID().uuidString, type: type, bookUrl: bookUrl, payload: payload)
         var q = queue
@@ -49,15 +82,34 @@ class SyncQueue: NSObject {
         }
 
         var remaining = ops
+        var newConflicts = conflictStore
         for op in ops {
             do {
                 if op.type == .saveProgress,
                    let localDict = (try? JSONSerialization.jsonObject(with: op.payload)) as? [String: Any],
-                   let localTime = localDict["durChapterTime"] as? Int64 {
+                   let localTime = localDict["durChapterTime"] as? Int64,
+                   let localIndex = localDict["durChapterIndex"] as? Int {
                     if let serverBook = serverBooks[op.bookUrl],
-                       let serverTime = serverBook.durChapterTime, serverTime >= localTime {
-                        remaining.removeAll { $0.id == op.id }
-                        continue
+                       let serverTime = serverBook.durChapterTime {
+                        if serverTime >= localTime {
+                            remaining.removeAll { $0.id == op.id }
+                            continue
+                        }
+                        if serverBook.durChapterIndex != localIndex {
+                            let conflict = ProgressConflict(
+                                opId: op.id, bookUrl: op.bookUrl,
+                                bookName: serverBook.name,
+                                localIndex: localIndex,
+                                localTitle: localDict["durChapterTitle"] as? String,
+                                localTime: localTime,
+                                serverIndex: serverBook.durChapterIndex ?? 0,
+                                serverTitle: serverBook.durChapterTitle,
+                                serverTime: serverTime
+                            )
+                            newConflicts.append(conflict)
+                            remaining.removeAll { $0.id == op.id }
+                            continue
+                        }
                     }
                 }
                 try await execute(op)
@@ -67,6 +119,35 @@ class SyncQueue: NSObject {
             }
         }
         queue = remaining
+        conflictStore = newConflicts
+        if !newConflicts.isEmpty {
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .conflictsDidChange, object: nil)
+            }
+        }
+    }
+
+    func resolveConflict(opId: String, useLocal: Bool) async {
+        var c = conflictStore
+        guard let idx = c.firstIndex(where: { $0.opId == opId }) else { return }
+        let conflict = c.remove(at: idx)
+        conflictStore = c
+
+        if useLocal {
+            let dict: [String: Any] = [
+                "bookUrl": conflict.bookUrl,
+                "durChapterIndex": conflict.localIndex,
+                "durChapterTitle": conflict.localTitle ?? "",
+                "durChapterTime": conflict.localTime
+            ]
+            if let payload = try? JSONSerialization.data(withJSONObject: dict) {
+                let op = SyncOperation(id: conflict.opId, type: .saveProgress, bookUrl: conflict.bookUrl, payload: payload)
+                var q = queue
+                q.append(op)
+                queue = q
+            }
+        }
+        await processAll()
     }
 
     private func execute(_ op: SyncOperation) async throws {
@@ -101,5 +182,6 @@ class SyncQueue: NSObject {
 
     func clear() {
         queue = []
+        conflictStore = []
     }
 }

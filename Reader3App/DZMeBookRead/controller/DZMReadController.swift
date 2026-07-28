@@ -42,6 +42,16 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         
         // 监控阅读长按视图通知
         monitorReadLongPressView()
+
+        startAutoSaveTimer()
+    }
+
+    private var autoSaveTimer: Timer?
+
+    private func startAutoSaveTimer() {
+        autoSaveTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            self?.saveReadingProgress()
+        }
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -56,6 +66,9 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         super.viewWillDisappear(animated)
         
         UIApplication.shared.setStatusBarStyle(.default, animated: true)
+
+        autoSaveTimer?.invalidate()
+        autoSaveTimer = nil
         
         saveReadingProgress()
     }
