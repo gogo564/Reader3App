@@ -1,57 +1,5 @@
 import UIKit
 
-class CacheManagerCell: UITableViewCell {
-    let statusLabel = UILabel()
-    let progressView = UIProgressView(progressViewStyle: .bar)
-    let pauseBtn: UIButton = {
-        let b = UIButton(type: .system)
-        b.setImage(UIImage(systemName: "pause.fill"), for: .normal)
-        b.tintColor = .systemOrange
-        return b
-    }()
-    let deleteBtn: UIButton = {
-        let b = UIButton(type: .system)
-        b.setImage(UIImage(systemName: "trash"), for: .normal)
-        b.tintColor = .systemRed
-        return b
-    }()
-
-    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
-        super.init(style: .subtitle, reuseIdentifier: reuseIdentifier)
-        statusLabel.font = .systemFont(ofSize: 12)
-        statusLabel.textColor = .secondaryLabel
-        progressView.trackTintColor = UIColor.systemGray5
-        progressView.progressTintColor = UIColor.systemBlue
-        progressView.layer.cornerRadius = 4
-        progressView.clipsToBounds = true
-        contentView.addSubview(statusLabel)
-        contentView.addSubview(progressView)
-        contentView.addSubview(pauseBtn)
-        contentView.addSubview(deleteBtn)
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        let left = contentView.layoutMargins.left
-        let right = contentView.frame.width - contentView.layoutMargins.right
-        let btnArea: CGFloat = 80
-
-        textLabel?.frame.origin.x = left
-        textLabel?.frame.size.width = right - left - btnArea
-        detailTextLabel?.frame.origin.x = left
-        detailTextLabel?.frame.size.width = right - left - btnArea
-
-        statusLabel.frame = CGRect(x: left, y: detailTextLabel?.frame.maxY ?? textLabel!.frame.maxY + 2, width: right - left - btnArea, height: 16)
-        progressView.frame = CGRect(x: left, y: statusLabel.frame.maxY + 4, width: right - left - btnArea, height: 6)
-
-        let btnY = (contentView.frame.height - 32) / 2
-        deleteBtn.frame = CGRect(x: right - 36, y: btnY, width: 32, height: 32)
-        pauseBtn.frame = CGRect(x: right - 72, y: btnY, width: 32, height: 32)
-    }
-
-    required init?(coder: NSCoder) { nil }
-}
-
 class CacheManageViewController: UIViewController {
     private var books: [Book] = []
     private weak var shelfVC: ShelfViewController?
@@ -64,6 +12,7 @@ class CacheManageViewController: UIViewController {
         var isCancelled = false
         var currentIndex = 0
         var total = 0
+
         init(book: Book) { self.book = book }
     }
 
@@ -96,8 +45,7 @@ class CacheManageViewController: UIViewController {
 
     private func setupTableView() {
         tableView = UITableView(frame: .zero, style: .insetGrouped)
-        tableView.register(CacheManagerCell.self, forCellReuseIdentifier: "cell")
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "plain")
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cell")
         tableView.dataSource = self
         tableView.delegate = self
         tableView.backgroundColor = .clear
@@ -143,12 +91,6 @@ class CacheManageViewController: UIViewController {
         performCaching(task)
     }
 
-    private func reloadRow(bookUrl: String) {
-        guard let idx = books.firstIndex(where: { $0.bookUrl == bookUrl }) else { return }
-        let ip = IndexPath(row: idx + 1, section: 0)
-        tableView.reloadRows(at: [ip], with: .none)
-    }
-
     private func performCaching(_ task: CacheTask) {
         Task {
             do {
@@ -164,13 +106,13 @@ class CacheManageViewController: UIViewController {
                     }
                     if CacheManager.shared.isChapterCached(bookUrl: task.book.bookUrl, index: i) {
                         task.currentIndex = i + 1
-                        await MainActor.run { self.reloadRow(bookUrl: task.book.bookUrl) }
+                        await MainActor.run { self.tableView.reloadData() }
                         continue
                     }
                     let content = try await NetworkService.shared.getBookContent(bookUrl: task.book.bookUrl, index: i)
                     CacheManager.shared.cacheChapter(bookUrl: task.book.bookUrl, index: i, content: content)
                     task.currentIndex = i + 1
-                    await MainActor.run { self.reloadRow(bookUrl: task.book.bookUrl) }
+                    await MainActor.run { self.tableView.reloadData() }
                 }
                 await MainActor.run {
                     self.cacheTasks.removeValue(forKey: task.book.bookUrl)
@@ -211,8 +153,15 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
     }
 
     func tableView(_ tv: UITableView, cellForRowAt ip: IndexPath) -> UITableViewCell {
+        let reuseId = books.isEmpty || ip.row == 0 ? "cell" : "subtitle"
+        let cell: UITableViewCell
+        if let c = tv.dequeueReusableCell(withIdentifier: reuseId) {
+            cell = c
+        } else {
+            cell = UITableViewCell(style: reuseId == "subtitle" ? .subtitle : .default, reuseIdentifier: reuseId)
+        }
+        cell.accessoryType = .none
         if books.isEmpty {
-            let cell = tv.dequeueReusableCell(withIdentifier: "plain", for: ip)
             cell.textLabel?.text = "暂无书籍"
             cell.textLabel?.textColor = .secondaryLabel
             cell.textLabel?.textAlignment = .center
@@ -221,18 +170,16 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
             return cell
         }
         if ip.row == 0 {
-            let cell = tv.dequeueReusableCell(withIdentifier: "plain", for: ip)
             let pending = SyncQueue.shared.pendingCount
             cell.textLabel?.text = pending > 0
-                ? "同步队列: \(pending) 个待同步操作"
-                : "同步队列: 无待同步操作"
+                ? "同步队列: \(pending) 个待同步操作 ⏳"
+                : "同步队列: 无待同步操作 ✅"
             cell.textLabel?.textColor = .systemBlue
             cell.textLabel?.font = .systemFont(ofSize: 14)
             cell.backgroundColor = UIColor(white: 1, alpha: 0.7)
             cell.selectionStyle = .none
             return cell
         }
-        let cell = tv.dequeueReusableCell(withIdentifier: "cell", for: ip) as! CacheManagerCell
         let book = books[ip.row - 1]
         let cached = CacheManager.shared.cachedCount(book.bookUrl)
         let total = CacheManager.shared.cachedTotal(book.bookUrl)
@@ -240,79 +187,59 @@ extension CacheManageViewController: UITableViewDataSource, UITableViewDelegate 
 
         cell.textLabel?.text = book.name
         cell.backgroundColor = .white
-        cell.detailTextLabel?.text = nil
 
         if let t = task {
-            cell.pauseBtn.isHidden = false
-            cell.deleteBtn.isHidden = true
-            cell.pauseBtn.setImage(UIImage(systemName: t.isPaused ? "play.fill" : "pause.fill"), for: .normal)
-            cell.pauseBtn.tag = ip.row
-            cell.pauseBtn.removeTarget(nil, action: nil, for: .allEvents)
-            cell.pauseBtn.addTarget(self, action: #selector(togglePause(_:)), for: .touchUpInside)
-            cell.deleteBtn.tag = ip.row
-            cell.deleteBtn.removeTarget(nil, action: nil, for: .allEvents)
-            cell.deleteBtn.addTarget(self, action: #selector(deleteTapped(_:)), for: .touchUpInside)
-            let progress = t.total > 0 ? Float(t.currentIndex) / Float(t.total) : 0
-            cell.progressView.progress = progress
-            cell.progressView.isHidden = false
             if t.isPaused {
-                cell.statusLabel.text = "已暂停 \(t.currentIndex)/\(t.total) 章"
+                cell.detailTextLabel?.text = "已暂停 \(t.currentIndex)/\(t.total) 章"
                 cell.textLabel?.textColor = .systemOrange
-                cell.progressView.progressTintColor = .systemOrange
             } else {
-                cell.statusLabel.text = "缓存中 \(t.currentIndex)/\(t.total) 章"
+                cell.detailTextLabel?.text = "缓存中 \(t.currentIndex)/\(t.total) 章"
                 cell.textLabel?.textColor = .systemBlue
-                cell.progressView.progressTintColor = .systemBlue
             }
+            cell.selectionStyle = .default
+        } else if total > 0 && cached >= total {
+            cell.detailTextLabel?.text = "已缓存 \(cached)/\(total) 章 ✅"
+            cell.textLabel?.textColor = .darkText
+            cell.selectionStyle = .none
+        } else if total > 0 {
+            cell.detailTextLabel?.text = "已缓存 \(cached)/\(total) 章"
+            cell.textLabel?.textColor = .darkText
+            cell.selectionStyle = .default
         } else {
-            cell.pauseBtn.isHidden = true
-            cell.deleteBtn.isHidden = cached == 0
-            cell.deleteBtn.tag = ip.row
-            cell.deleteBtn.removeTarget(nil, action: nil, for: .allEvents)
-            cell.deleteBtn.addTarget(self, action: #selector(deleteTapped(_:)), for: .touchUpInside)
-            if total > 0 {
-                cell.progressView.isHidden = false
-                cell.progressView.progress = Float(cached) / Float(total)
-                cell.statusLabel.text = "已缓存 \(cached)/\(total) 章"
-                cell.textLabel?.textColor = .darkText
-                cell.progressView.progressTintColor = cached >= total ? .systemGreen : .systemBlue
-            } else {
-                cell.progressView.isHidden = true
-                cell.statusLabel.text = cached > 0 ? "已缓存 \(cached) 章（部分）" : "未缓存"
-                cell.textLabel?.textColor = .darkText
-            }
+            cell.detailTextLabel?.text = cached > 0 ? "已缓存 \(cached) 章（部分）" : "未缓存"
+            cell.textLabel?.textColor = .darkText
+            cell.selectionStyle = .default
         }
         return cell
-    }
-
-    @objc private func togglePause(_ sender: UIButton) {
-        let row = sender.tag
-        guard row > 0, row - 1 < books.count else { return }
-        let book = books[row - 1]
-        if let task = cacheTasks[book.bookUrl] {
-            task.isPaused.toggle()
-            tableView.reloadData()
-        }
-    }
-
-    @objc private func deleteTapped(_ sender: UIButton) {
-        let row = sender.tag
-        guard row > 0, row - 1 < books.count else { return }
-        let book = books[row - 1]
-        if cacheTasks[book.bookUrl] != nil { return }
-        clearCache(book)
     }
 
     func tableView(_: UITableView, didSelectRowAt ip: IndexPath) {
         guard ip.row > 0 else { return }
         let book = books[ip.row - 1]
-        if cacheTasks[book.bookUrl] != nil { return }
-        let cached = CacheManager.shared.cachedCount(book.bookUrl)
-        let total = CacheManager.shared.cachedTotal(book.bookUrl)
-        if total > 0 && cached >= total {
-            clearCache(book)
+        if let task = cacheTasks[book.bookUrl] {
+            task.isPaused.toggle()
+            tableView.reloadData()
         } else {
-            startCaching(book)
+            let cached = CacheManager.shared.cachedCount(book.bookUrl)
+            let total = CacheManager.shared.cachedTotal(book.bookUrl)
+            if total > 0 && cached >= total {
+                clearCache(book)
+            } else {
+                startCaching(book)
+            }
         }
+    }
+
+    func tableView(_: UITableView, trailingSwipeActionsConfigurationForRowAt ip: IndexPath) -> UISwipeActionsConfiguration? {
+        guard ip.row > 0 else { return nil }
+        let book = books[ip.row - 1]
+        if cacheTasks[book.bookUrl] != nil { return nil }
+        let cached = CacheManager.shared.cachedCount(book.bookUrl)
+        guard cached > 0 else { return nil }
+        let clear = UIContextualAction(style: .destructive, title: "清除") { [weak self] _, _, done in
+            self?.clearCache(book)
+            done(true)
+        }
+        return UISwipeActionsConfiguration(actions: [clear])
     }
 }
