@@ -462,15 +462,19 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                                   coverUrl: result.coverUrl, origin: result.origin, originName: result.originName,
                                   intro: result.intro, latestChapterTitle: result.latestChapterTitle,
                                   type: result.type, tocUrl: result.tocUrl)
-                try? await NetworkService.shared.deleteBook(bookUrl: readModel.bookID)
+                do { try await NetworkService.shared.deleteBook(bookUrl: readModel.bookID) } catch { print("deleteBook failed: \(error)") }
                 CacheManager.shared.clearCache(bookUrl: readModel.bookID)
                 try? await NetworkService.shared.saveBook(newBook)
                 await MainActor.run {
                     if var cached = CacheManager.shared.getCachedBookshelf() {
                         if let idx = cached.firstIndex(where: { $0.bookUrl == readModel.bookID }) {
                             cached[idx] = newBook
-                            CacheManager.shared.cacheBookshelf(cached)
+                        } else {
+                            cached.append(newBook)
                         }
+                        CacheManager.shared.cacheBookshelf(cached)
+                    } else {
+                        CacheManager.shared.cacheBookshelf([newBook])
                     }
                     catalogChapters = chapters
                     readModel.bookID = newUrl
