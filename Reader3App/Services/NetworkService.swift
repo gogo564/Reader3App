@@ -201,7 +201,7 @@ class NetworkService {
 
     private func buildURL(_ path: String, query: [String: String]? = nil) throws -> URL {
         var comps = URLComponents(string: "\(appState.apiURL)\(path)")
-        var items = query?.map { URLQueryItem(name: $0.key, value: $0.value) } ?? []
+        let items = query?.map { URLQueryItem(name: $0.key, value: $0.value) } ?? []
         if !items.isEmpty { comps?.queryItems = items }
         guard let url = comps?.url else { throw APIError.invalidURL }
         return url
