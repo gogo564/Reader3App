@@ -302,6 +302,7 @@ class ShelfViewController: UIViewController {
             guard let self = self else { return }
             self.books.removeAll { $0.bookUrl == book.bookUrl }
             self.collectionView.reloadData()
+            CacheManager.shared.clearCache(bookUrl: book.bookUrl)
             Task {
                 do {
                     try await NetworkService.shared.deleteBook(bookUrl: book.bookUrl)
