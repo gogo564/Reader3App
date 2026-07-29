@@ -422,6 +422,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                                   coverUrl: m.coverUrl, origin: m.origin, originName: m.originName,
                                   intro: m.intro, latestChapterTitle: m.latestChapterTitle,
                                   type: m.type, tocUrl: m.tocUrl)
+                try? await NetworkService.shared.deleteBook(bookUrl: readModel.bookID)
                 try? await NetworkService.shared.saveBook(newBook)
                 await MainActor.run {
                     if var cached = CacheManager.shared.getCachedBookshelf() {
@@ -458,7 +459,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                     readMenu.topView.updateMarkButton()
                     readMenu.bottomView.progressView.reloadProgress()
                     creatPageController(displayController: GetCurrentReadViewController())
-                    self.toast("已切换到「\(source.bookSourceName ?? "新源")」")
+                    self.showSwitchBanner(source.bookSourceName ?? "新源")
                 }
             } catch {
                 await MainActor.run { self.toast("换源失败: \(error.localizedDescription)") }
@@ -484,6 +485,36 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         UIView.animate(withDuration: 0.25) { lbl.alpha = 1 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             UIView.animate(withDuration: 0.25) { lbl.alpha = 0 } completion: { _ in lbl.removeFromSuperview() }
+        }
+    }
+
+    private func showSwitchBanner(_ sourceName: String) {
+        let bar = UIView()
+        bar.backgroundColor = .systemGreen
+        bar.alpha = 0
+        view.addSubview(bar)
+        let h: CGFloat = view.safeAreaInsets.top + 44
+        bar.frame = CGRect(x: 0, y: -h, width: view.frame.width, height: h)
+        let label = UILabel()
+        label.text = "已切换至「\(sourceName)」"
+        label.textColor = .white
+        label.textAlignment = .center
+        label.font = .boldSystemFont(ofSize: 15)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        bar.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.bottomAnchor.constraint(equalTo: bar.bottomAnchor, constant: -8),
+            label.centerXAnchor.constraint(equalTo: bar.centerXAnchor),
+        ])
+        UIView.animate(withDuration: 0.35, delay: 0, options: .curveEaseOut) {
+            bar.frame.origin.y = 0
+            bar.alpha = 1
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            UIView.animate(withDuration: 0.35, delay: 0, options: .curveEaseIn) {
+                bar.frame.origin.y = -h
+                bar.alpha = 0
+            } completion: { _ in bar.removeFromSuperview() }
         }
     }
 
