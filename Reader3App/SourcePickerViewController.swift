@@ -19,13 +19,10 @@ private enum SourceStatus {
 
 class SourcePickerViewController: UIViewController {
     private let tableView = UITableView()
-    private let titleLabel = UILabel()
     private var items: [SourceItem]
     private let bookName: String
     private let author: String?
     private let onSelect: (BookSource) -> Void
-    private let maxResults = 5
-    private var foundCount = 0
 
     init(sources: [BookSource], bookName: String, author: String?, onSelect: @escaping (BookSource) -> Void) {
         self.items = sources.map { SourceItem(source: $0, status: .searching, elapsed: 0) }
@@ -49,6 +46,7 @@ class SourcePickerViewController: UIViewController {
         container.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(container)
 
+        let titleLabel = UILabel()
         titleLabel.text = "选择书源"
         titleLabel.font = .boldSystemFont(ofSize: 17)
         titleLabel.textAlignment = .center
@@ -125,7 +123,7 @@ class SourcePickerViewController: UIViewController {
                     self.reloadAndSort()
                 }
             }
-            if items.allSatisfy({ $0.status != .searching }) && foundCount == 0 {
+            if items.allSatisfy({ $0.status != .searching }) && !items.contains(where: { $0.status == .found }) {
                 let alert = UIAlertController(title: "提示", message: "所有书源均未找到本书", preferredStyle: .alert)
                 alert.addAction(UIAlertAction(title: "确定", style: .default) { [weak self] _ in
                     self?.dismiss(animated: true)
@@ -140,16 +138,6 @@ class SourcePickerViewController: UIViewController {
             if a.status.order != b.status.order { return a.status.order < b.status.order }
             return a.elapsed < b.elapsed
         }
-        foundCount = 0
-        for i in items.indices {
-            if items[i].status == .found {
-                foundCount += 1
-                if foundCount > maxResults {
-                    items[i].status = .notFound
-                }
-            }
-        }
-        titleLabel.text = "选择书源（已找到\(foundCount)个，取最快\(maxResults)个）"
         tableView.reloadData()
     }
 }
