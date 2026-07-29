@@ -370,12 +370,12 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                let all = try await NetworkService.shared.searchBook(key: bookName, searchType: "multi", concurrentCount: 24)
+                let all = try await NetworkService.shared.searchBook(key: bookName, searchType: "multi", concurrentCount: 99)
+                let bkLower = bookName.trimmingCharacters(in: .whitespaces).lowercased()
                 var matched: [SearchResult] = []
                 for r in all {
-                    guard r.name == bookName else { continue }
-                    if let a = author, !a.isEmpty, r.author != a { continue }
                     guard !r.bookUrl.isEmpty else { continue }
+                    guard r.name.trimmingCharacters(in: .whitespaces).lowercased().contains(bkLower) else { continue }
                     matched.append(r)
                 }
                 guard !matched.isEmpty else {
