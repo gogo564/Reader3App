@@ -93,8 +93,9 @@ extension SourcePickerViewController: UITableViewDataSource, UITableViewDelegate
     }
 
     func tableView(_: UITableView, didSelectRowAt ip: IndexPath) {
+        let result = results[ip.row]
         dismiss(animated: true) { [weak self] in
-            self?.onSelect(results[ip.row])
+            self?.onSelect(result)
         }
     }
 }
