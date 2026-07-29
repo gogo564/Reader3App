@@ -417,6 +417,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                                   intro: result.intro, latestChapterTitle: result.latestChapterTitle,
                                   type: result.type, tocUrl: result.tocUrl)
                 try? await NetworkService.shared.deleteBook(bookUrl: readModel.bookID)
+                CacheManager.shared.clearCache(bookUrl: readModel.bookID)
                 try? await NetworkService.shared.saveBook(newBook)
                 await MainActor.run {
                     if var cached = CacheManager.shared.getCachedBookshelf() {
