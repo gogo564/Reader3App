@@ -16,7 +16,7 @@ enum APIError: LocalizedError {
     }
 }
 
-class NetworkService {
+final class NetworkService: @unchecked Sendable {
     static let shared = NetworkService()
     private init() {}
 
