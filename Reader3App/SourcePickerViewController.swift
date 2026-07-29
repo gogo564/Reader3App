@@ -3,11 +3,23 @@ import UIKit
 class SourcePickerViewController: UIViewController {
     private let tableView = UITableView()
     private var items: [(SearchResult, TimeInterval)] = []
+    private var seenOrigins = Set<String>()
+    private(set) var resultCount = 0
+    private let maxResults: Int
+    private let startTime: CFAbsoluteTime
+    private let totalTimeout: TimeInterval
     private let onSelect: (SearchResult) -> Void
     private let titleLabel = UILabel()
     private let loadingIndicator = UIActivityIndicatorView(style: .medium)
 
-    init(onSelect: @escaping (SearchResult) -> Void) {
+    var shouldStop: Bool {
+        resultCount >= maxResults || (CFAbsoluteTimeGetCurrent() - startTime) >= totalTimeout
+    }
+
+    init(maxResults: Int = 10, totalTimeout: TimeInterval = 15, onSelect: @escaping (SearchResult) -> Void) {
+        self.maxResults = maxResults
+        self.startTime = CFAbsoluteTimeGetCurrent()
+        self.totalTimeout = totalTimeout
         self.onSelect = onSelect
         super.init(nibName: nil, bundle: nil)
     }
@@ -77,12 +89,16 @@ class SourcePickerViewController: UIViewController {
         dismiss(animated: true)
     }
 
-    func addResult(_ r: SearchResult, latency: TimeInterval) {
+    func addResult(_ r: SearchResult, latency: TimeInterval, origin: String) {
+        guard seenOrigins.insert(origin).inserted else { return }
+        resultCount += 1
         items.append((r, latency))
-        titleLabel.text = "选择书源（共\(items.count)个）"
+        titleLabel.text = "选择书源（共\(resultCount)个）"
         loadingIndicator.stopAnimating()
         tableView.reloadData()
     }
+
+
 }
 
 extension SourcePickerViewController: UITableViewDataSource, UITableViewDelegate {

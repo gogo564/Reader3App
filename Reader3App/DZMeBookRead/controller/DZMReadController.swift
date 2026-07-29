@@ -378,20 +378,14 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
             let perTimeout: UInt64 = 8_000_000_000
             let totalTimeout: TimeInterval = 15
             let bookNameLower = bookName.trimmingCharacters(in: .whitespaces).lowercased()
-            var seenOrigins = Set<String>()
-            var resultCount = 0
 
-            var picker: SourcePickerViewController!
-            await MainActor.run {
-                picker = SourcePickerViewController { [weak self] result in
-                    self?.switchToSource(result: result)
-                }
-                picker.modalPresentationStyle = .overFullScreen
-                self.present(picker, animated: false)
+            let picker = SourcePickerViewController(maxResults: maxResults, totalTimeout: totalTimeout) { [weak self] result in
+                self?.switchToSource(result: result)
             }
+            picker.modalPresentationStyle = .overFullScreen
+            await MainActor.run { self.present(picker, animated: false) }
 
             let validSources = sources.filter { !($0.bookSourceUrl?.isEmpty ?? true) }
-            let startTime = CFAbsoluteTimeGetCurrent()
 
             await withTaskGroup(of: (SearchResult?, TimeInterval, String?).self) { group in
                 for src in validSources {
@@ -418,10 +412,12 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
                 for await (result, elapsed, srcUrl) in group {
                     guard let r = result, let origin = r.origin ?? srcUrl else { continue }
-                    guard seenOrigins.insert(origin).inserted else { continue }
-                    resultCount += 1
-                    await MainActor.run { picker?.addResult(r, latency: elapsed) }
-                    if resultCount >= maxResults || (CFAbsoluteTimeGetCurrent() - startTime) >= totalTimeout {
+                    var stop = false
+                    await MainActor.run {
+                        picker.addResult(r, latency: elapsed, origin: origin)
+                        stop = picker.shouldStop
+                    }
+                    if stop {
                         group.cancelAll()
                         break
                     }
@@ -429,8 +425,8 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
             }
 
             await MainActor.run {
-                if resultCount == 0 {
-                    picker?.dismiss(animated: true) { self.toast("未找到可用书源") }
+                if picker.resultCount == 0 {
+                    picker.dismiss(animated: true) { self.toast("未找到可用书源") }
                 }
             }
         }
