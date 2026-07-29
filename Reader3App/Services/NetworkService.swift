@@ -115,7 +115,7 @@ class NetworkService {
 
     // MARK: - Auto Source Switch
 
-    func searchOnSource(bookName: String, sourceUrl: String) async throws -> [SearchResult] {
+    func searchOnSource(bookName: String, sourceUrl: String, timeout: TimeInterval = 30) async throws -> [SearchResult] {
         let body = try JSONSerialization.data(withJSONObject: [
             "key": bookName,
             "bookSourceUrl": sourceUrl,
@@ -123,7 +123,7 @@ class NetworkService {
             "page": 1,
             "lastIndex": -1
         ] as [String: Any])
-        let data = try await post("/searchBook", body: body, timeout: 30)
+        let data = try await post("/searchBook", body: body, timeout: timeout)
         let resp = try JSONDecoder().decode(APIResponse<[SearchResult]>.self, from: data)
         guard resp.isSuccess, let result = resp.data else {
             throw APIError.apiError(resp.errorMsg ?? "搜索失败")
