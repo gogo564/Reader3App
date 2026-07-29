@@ -28,7 +28,17 @@ jobs:
             archive 2>&1 | tee "$LOG"
           RC=${PIPESTATUS[0]}
           gzip "$LOG" && mv "$LOG.gz" /tmp/build_log.gz
-          [ $RC -eq 0 ] || exit $RC
+          if [ $RC -ne 0 ]; then
+            set +e
+            echo "=== BUILD LOG (error lines) ==="
+            gzip -dc /tmp/build_log.gz 2>/dev/null | grep -i "error:" | head -20
+            echo "=== BUILD LOG (last 30 lines) ==="
+            gzip -dc /tmp/build_log.gz 2>/dev/null | tail -30
+            echo "=== BUILD LOG (first 20 lines) ==="
+            gzip -dc /tmp/build_log.gz 2>/dev/null | head -20
+            set -e
+            exit $RC
+          fi
 
       - name: Upload build log
         if: failure()
