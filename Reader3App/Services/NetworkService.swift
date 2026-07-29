@@ -88,10 +88,10 @@ class NetworkService {
     }
 
     // MARK: - Reading
-    func getChapterList(bookUrl: String, bookSourceUrl: String? = nil, refresh: Bool = false) async throws -> [Chapter] {
+    func getChapterList(bookUrl: String, bookSourceUrl: String? = nil, refresh: Bool = false, timeout: TimeInterval = 30) async throws -> [Chapter] {
         var query: [String: String] = ["url": bookUrl, "refresh": refresh ? "1" : "0"]
         if let src = bookSourceUrl { query["bookSourceUrl"] = src }
-        let data = try await get("/getChapterList", query: query)
+        let data = try await get("/getChapterList", query: query, timeout: timeout)
         return try decode(data)
     }
 
@@ -215,9 +215,9 @@ class NetworkService {
         return URLSession(configuration: config)
     }()
 
-    private func get(_ path: String, query: [String: String]? = nil) async throws -> Data {
+    private func get(_ path: String, query: [String: String]? = nil, timeout: TimeInterval = 30) async throws -> Data {
         let url = try buildURL(path, query: query)
-        var req = URLRequest(url: url, timeoutInterval: 30)
+        var req = URLRequest(url: url, timeoutInterval: timeout)
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let (data, resp) = try await session.data(for: req)
         guard let http = resp as? HTTPURLResponse else {

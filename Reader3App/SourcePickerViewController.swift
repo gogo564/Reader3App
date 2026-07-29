@@ -2,11 +2,12 @@ import UIKit
 
 class SourcePickerViewController: UIViewController {
     private let tableView = UITableView()
-    private let results: [SearchResult]
+    private var results: [SearchResult] = []
     private let onSelect: (SearchResult) -> Void
+    private let titleLabel = UILabel()
+    private let loadingIndicator = UIActivityIndicatorView(style: .medium)
 
-    init(results: [SearchResult], onSelect: @escaping (SearchResult) -> Void) {
-        self.results = results
+    init(onSelect: @escaping (SearchResult) -> Void) {
         self.onSelect = onSelect
         super.init(nibName: nil, bundle: nil)
     }
@@ -25,12 +26,14 @@ class SourcePickerViewController: UIViewController {
         container.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(container)
 
-        let titleLabel = UILabel()
-        titleLabel.text = "选择书源（共\(results.count)个）"
+        titleLabel.text = "搜索中..."
         titleLabel.font = .boldSystemFont(ofSize: 17)
         titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(titleLabel)
+
+        loadingIndicator.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(loadingIndicator)
 
         let cancelButton = UIButton(type: .system)
         cancelButton.setTitle("取消", for: .normal)
@@ -52,6 +55,9 @@ class SourcePickerViewController: UIViewController {
             titleLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
             titleLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
 
+            loadingIndicator.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            loadingIndicator.trailingAnchor.constraint(equalTo: titleLabel.leadingAnchor, constant: -6),
+
             cancelButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
             cancelButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
 
@@ -68,6 +74,13 @@ class SourcePickerViewController: UIViewController {
 
     @objc private func dismissSelf() {
         dismiss(animated: true)
+    }
+
+    func addResult(_ r: SearchResult) {
+        results.append(r)
+        titleLabel.text = "选择书源（共\(results.count)个）"
+        loadingIndicator.stopAnimating()
+        tableView.reloadData()
     }
 }
 

@@ -374,19 +374,29 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                 return
             }
 
-            let maxResults = 8
-            let perSourceTimeout: UInt64 = 8_000_000_000
+            let maxResults = 6
+            let searchTimeout: UInt64 = 3_000_000_000
+            let chapterTimeout: TimeInterval = 3
             let totalTimeout: TimeInterval = 15
             let batchSize = 20
             let bookNameLower = bookName.trimmingCharacters(in: .whitespaces).lowercased()
             let startTime = CFAbsoluteTimeGetCurrent()
             var seenOrigins = Set<String>()
-            var results: [SearchResult] = []
+            var resultCount = 0
             let validSources = sources.filter { !($0.bookSourceUrl?.isEmpty ?? true) }
+
+            var picker: SourcePickerViewController!
+            await MainActor.run {
+                picker = SourcePickerViewController { [weak self] result in
+                    self?.switchToSource(result: result)
+                }
+                picker.modalPresentationStyle = .overFullScreen
+                self.present(picker, animated: false)
+            }
 
             for batchStart in stride(from: 0, to: validSources.count, by: batchSize) {
                 let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-                guard results.count < maxResults && elapsed < totalTimeout else { break }
+                guard resultCount < maxResults && elapsed < totalTimeout else { break }
                 let batch = validSources[batchStart..<min(batchStart + batchSize, validSources.count)]
 
                 await withTaskGroup(of: (SearchResult?, String?).self) { group in
@@ -394,15 +404,17 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                         guard let srcUrl = src.bookSourceUrl else { continue }
                         group.addTask {
                             let searchTask = Task {
-                                try await NetworkService.shared.searchOnSource(bookName: bookName, sourceUrl: srcUrl, timeout: 8)
+                                try await NetworkService.shared.searchOnSource(bookName: bookName, sourceUrl: srcUrl, timeout: 3)
                             }
                             Task {
-                                try await Task.sleep(nanoseconds: perSourceTimeout)
+                                try await Task.sleep(nanoseconds: searchTimeout)
                                 searchTask.cancel()
                             }
                             guard let all = try? await searchTask.value else { return (nil, srcUrl) }
                             for r in all {
                                 guard r.name.trimmingCharacters(in: .whitespaces).lowercased().contains(bookNameLower) else { continue }
+                                guard let chs = try? await NetworkService.shared.getChapterList(bookUrl: r.bookUrl, bookSourceUrl: srcUrl, timeout: chapterTimeout),
+                                      !chs.isEmpty else { return (nil, srcUrl) }
                                 return (r, srcUrl)
                             }
                             return (nil, srcUrl)
@@ -411,8 +423,9 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                     for await (result, srcUrl) in group {
                         guard let r = result, let origin = r.origin ?? srcUrl else { continue }
                         guard seenOrigins.insert(origin).inserted else { continue }
-                        results.append(r)
-                        if results.count >= maxResults {
+                        resultCount += 1
+                        await MainActor.run { picker?.addResult(r) }
+                        if resultCount >= maxResults {
                             group.cancelAll()
                             break
                         }
@@ -420,17 +433,10 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                 }
             }
 
-            guard !results.isEmpty else {
-                await MainActor.run { self.toast("未找到可用书源") }
-                return
-            }
-
             await MainActor.run {
-                let picker = SourcePickerViewController(results: results) { [weak self] result in
-                    self?.switchToSource(result: result)
+                if resultCount == 0 {
+                    picker?.dismiss(animated: true) { self.toast("未找到可用书源") }
                 }
-                picker.modalPresentationStyle = .overFullScreen
-                self.present(picker, animated: false)
             }
         }
     }
