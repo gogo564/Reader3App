@@ -364,53 +364,47 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     /// 点击换源
     func readMenuClickSwitchSource(readMenu: DZMReadMenu!) {
         readMenu.showMenu(isShow: false)
+        let bookName = readModel.bookName ?? ""
+        let author = bookAuthor
+        toast("正在搜索全部书源...")
         Task { [weak self] in
             guard let self = self else { return }
-            guard let sources = try? await NetworkService.shared.getBookSources(simple: true) else {
-                await MainActor.run { self.toast("获取书源失败") }
-                return
-            }
-            let bookName = readModel.bookName ?? ""
-            let author = bookAuthor
-            await MainActor.run {
-                let picker = SourcePickerViewController(sources: sources, bookName: bookName, author: author) { [weak self] src in
-                    self?.switchToSource(src)
+            do {
+                let all = try await NetworkService.shared.searchBook(key: bookName, searchType: "multi", concurrentCount: 24)
+                var matched: [SearchResult] = []
+                for r in all {
+                    guard r.name == bookName else { continue }
+                    if let a = author, !a.isEmpty, r.author != a { continue }
+                    guard !r.bookUrl.isEmpty else { continue }
+                    matched.append(r)
                 }
-                picker.modalPresentationStyle = .overFullScreen
-                present(picker, animated: false)
+                guard !matched.isEmpty else {
+                    await MainActor.run { self.toast("未找到可用书源") }
+                    return
+                }
+                await MainActor.run {
+                    let picker = SourcePickerViewController(results: matched) { [weak self] result in
+                        self?.switchToSource(result: result)
+                    }
+                    picker.modalPresentationStyle = .overFullScreen
+                    self.present(picker, animated: false)
+                }
+            } catch {
+                await MainActor.run { self.toast("搜索失败: \(error.localizedDescription)") }
             }
         }
     }
 
-    private func switchToSource(_ source: BookSource) {
-        guard let srcUrl = source.bookSourceUrl, !srcUrl.isEmpty else {
-            toast("该书源无效")
-            return
-        }
+    private func switchToSource(result: SearchResult) {
+        let newUrl = result.bookUrl
+        let srcUrl = result.origin
         let bookName = readModel.bookName ?? ""
         let author = bookAuthor
         let currentIndex = readModel.recordModel.chapterModel.id?.intValue ?? 0
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                await MainActor.run { self.toast("正在搜索...") }
-                let results = try await NetworkService.shared.searchOnSource(bookName: bookName, sourceUrl: srcUrl)
-                var match: SearchResult?
-                for r in results {
-                    guard r.name == bookName else { continue }
-                    if let a = author, !a.isEmpty, r.author != a { continue }
-                    match = r
-                    break
-                }
-                guard let m = match else {
-                    await MainActor.run { self.toast("未在本书源找到「\(bookName)」") }
-                    return
-                }
-                let newUrl = m.bookUrl
-                guard !newUrl.isEmpty else {
-                    await MainActor.run { self.toast("该书源不可用") }
-                    return
-                }
+                await MainActor.run { self.toast("正在切换...") }
                 let chapters = try await NetworkService.shared.getChapterList(bookUrl: newUrl, bookSourceUrl: srcUrl)
                 let safeIndex = currentIndex < chapters.count ? currentIndex : 0
                 let rawContent = try await NetworkService.shared.getBookContent(bookUrl: newUrl, index: safeIndex)
@@ -419,9 +413,10 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                 CacheManager.shared.cacheChapters(bookUrl: newUrl, chapters: chapters)
                 CacheManager.shared.setCachedTotal(newUrl, total: chapters.count)
                 let newBook = Book(bookUrl: newUrl, name: bookName, author: author,
-                                  coverUrl: m.coverUrl, origin: m.origin, originName: m.originName,
-                                  intro: m.intro, latestChapterTitle: m.latestChapterTitle,
-                                  type: m.type, tocUrl: m.tocUrl)
+                                  coverUrl: result.coverUrl, origin: result.origin, originName: result.originName,
+                                  intro: result.intro, latestChapterTitle: result.latestChapterTitle,
+                                  type: result.type, tocUrl: result.tocUrl)
+                try? await NetworkService.shared.deleteBook(bookUrl: readModel.bookID)
                 try? await NetworkService.shared.saveBook(newBook)
                 await MainActor.run {
                     if var cached = CacheManager.shared.getCachedBookshelf() {
@@ -458,7 +453,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                     readMenu.topView.updateMarkButton()
                     readMenu.bottomView.progressView.reloadProgress()
                     creatPageController(displayController: GetCurrentReadViewController())
-                    self.toast("已切换到「\(source.bookSourceName ?? "新源")」")
+                    self.toast("已切换到「\(result.originName ?? "新源")」")
                 }
             } catch {
                 await MainActor.run { self.toast("换源失败: \(error.localizedDescription)") }
