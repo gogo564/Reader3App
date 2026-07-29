@@ -2,7 +2,7 @@ import UIKit
 
 class SourcePickerViewController: UIViewController {
     private let tableView = UITableView()
-    private var results: [SearchResult] = []
+    private var items: [(SearchResult, TimeInterval)] = []
     private let onSelect: (SearchResult) -> Void
     private let titleLabel = UILabel()
     private let loadingIndicator = UIActivityIndicatorView(style: .medium)
@@ -34,6 +34,7 @@ class SourcePickerViewController: UIViewController {
 
         loadingIndicator.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(loadingIndicator)
+        loadingIndicator.startAnimating()
 
         let cancelButton = UIButton(type: .system)
         cancelButton.setTitle("取消", for: .normal)
@@ -76,16 +77,16 @@ class SourcePickerViewController: UIViewController {
         dismiss(animated: true)
     }
 
-    func addResult(_ r: SearchResult) {
-        results.append(r)
-        titleLabel.text = "选择书源（共\(results.count)个）"
+    func addResult(_ r: SearchResult, latency: TimeInterval) {
+        items.append((r, latency))
+        titleLabel.text = "选择书源（共\(items.count)个）"
         loadingIndicator.stopAnimating()
         tableView.reloadData()
     }
 }
 
 extension SourcePickerViewController: UITableViewDataSource, UITableViewDelegate {
-    func tableView(_: UITableView, numberOfRowsInSection _: Int) -> Int { results.count }
+    func tableView(_: UITableView, numberOfRowsInSection _: Int) -> Int { items.count }
 
     func tableView(_ tv: UITableView, cellForRowAt ip: IndexPath) -> UITableViewCell {
         let id = "sub"
@@ -93,20 +94,26 @@ extension SourcePickerViewController: UITableViewDataSource, UITableViewDelegate
         if cell == nil {
             cell = UITableViewCell(style: .subtitle, reuseIdentifier: id)
         }
-        let r = results[ip.row]
+        let (r, latency) = items[ip.row]
         cell!.textLabel?.text = r.originName ?? "未知源"
         cell!.textLabel?.font = .systemFont(ofSize: 15)
         cell!.textLabel?.textColor = .label
         cell!.detailTextLabel?.text = r.latestChapterTitle ?? ""
         cell!.detailTextLabel?.font = .systemFont(ofSize: 12)
         cell!.detailTextLabel?.textColor = .secondaryLabel
-        cell!.accessoryType = .disclosureIndicator
         cell!.selectionStyle = .default
+
+        let latLbl = UILabel()
+        latLbl.text = String(format: "%.1fs", latency)
+        latLbl.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        latLbl.textColor = latency < 2 ? .systemGreen : latency < 4 ? .systemOrange : .systemRed
+        latLbl.sizeToFit()
+        cell!.accessoryView = latLbl
         return cell!
     }
 
     func tableView(_: UITableView, didSelectRowAt ip: IndexPath) {
-        let result = results[ip.row]
+        let (result, _) = items[ip.row]
         dismiss(animated: true) { [weak self] in
             self?.onSelect(result)
         }

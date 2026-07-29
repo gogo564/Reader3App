@@ -374,16 +374,12 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                 return
             }
 
-            let maxResults = 6
-            let searchTimeout: UInt64 = 6_000_000_000
-            let chapterTimeout: TimeInterval = 6
-            let totalTimeout: TimeInterval = 20
-            let batchSize = 20
+            let maxResults = 10
+            let perTimeout: UInt64 = 8_000_000_000
+            let totalTimeout: TimeInterval = 15
             let bookNameLower = bookName.trimmingCharacters(in: .whitespaces).lowercased()
-            let startTime = CFAbsoluteTimeGetCurrent()
             var seenOrigins = Set<String>()
             var resultCount = 0
-            let validSources = sources.filter { !($0.bookSourceUrl?.isEmpty ?? true) }
 
             var picker: SourcePickerViewController!
             await MainActor.run {
@@ -394,41 +390,40 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                 self.present(picker, animated: false)
             }
 
-            for batchStart in stride(from: 0, to: validSources.count, by: batchSize) {
-                let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-                guard resultCount < maxResults && elapsed < totalTimeout else { break }
-                let batch = validSources[batchStart..<min(batchStart + batchSize, validSources.count)]
+            let validSources = sources.filter { !($0.bookSourceUrl?.isEmpty ?? true) }
+            let startTime = CFAbsoluteTimeGetCurrent()
 
-                await withTaskGroup(of: (SearchResult?, String?).self) { group in
-                    for src in batch {
-                        guard let srcUrl = src.bookSourceUrl else { continue }
-                        group.addTask {
-                            let searchTask = Task {
-                                try await NetworkService.shared.searchOnSource(bookName: bookName, sourceUrl: srcUrl, timeout: 6)
-                            }
-                            Task {
-                                try await Task.sleep(nanoseconds: searchTimeout)
-                                searchTask.cancel()
-                            }
-                            guard let all = try? await searchTask.value else { return (nil, srcUrl) }
+            await withTaskGroup(of: (SearchResult?, TimeInterval, String?).self) { group in
+                for src in validSources {
+                    guard let srcUrl = src.bookSourceUrl else { continue }
+                    group.addTask {
+                        let t = Task {
+                            let start = CFAbsoluteTimeGetCurrent()
+                            let all = try await NetworkService.shared.searchOnSource(bookName: bookName, sourceUrl: srcUrl, timeout: 8)
+                            let elapsed = CFAbsoluteTimeGetCurrent() - start
                             for r in all {
                                 guard r.name.trimmingCharacters(in: .whitespaces).lowercased().contains(bookNameLower) else { continue }
-                                guard let chs = try? await NetworkService.shared.getChapterList(bookUrl: r.bookUrl, bookSourceUrl: srcUrl, timeout: chapterTimeout),
-                                      !chs.isEmpty else { return (nil, srcUrl) }
-                                return (r, srcUrl)
+                                return (r, elapsed, srcUrl)
                             }
-                            return (nil, srcUrl)
+                            return (nil, 0, srcUrl)
                         }
+                        Task {
+                            try await Task.sleep(nanoseconds: perTimeout)
+                            t.cancel()
+                        }
+                        guard let (r, e, u) = try? await t.value, let rr = r else { return (nil, 0, srcUrl) }
+                        return (rr, e, u)
                     }
-                    for await (result, srcUrl) in group {
-                        guard let r = result, let origin = r.origin ?? srcUrl else { continue }
-                        guard seenOrigins.insert(origin).inserted else { continue }
-                        resultCount += 1
-                        await MainActor.run { picker?.addResult(r) }
-                        if resultCount >= maxResults {
-                            group.cancelAll()
-                            break
-                        }
+                }
+
+                for await (result, elapsed, srcUrl) in group {
+                    guard let r = result, let origin = r.origin ?? srcUrl else { continue }
+                    guard seenOrigins.insert(origin).inserted else { continue }
+                    resultCount += 1
+                    await MainActor.run { picker?.addResult(r, latency: elapsed) }
+                    if resultCount >= maxResults || (CFAbsoluteTimeGetCurrent() - startTime) >= totalTimeout {
+                        group.cancelAll()
+                        break
                     }
                 }
             }
