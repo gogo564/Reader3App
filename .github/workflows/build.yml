@@ -25,18 +25,21 @@ jobs:
           xcodebuild -project Reader3App.xcodeproj -scheme Reader3App -destination generic/platform=iOS \
             -archivePath /tmp/Reader3App.xcarchive \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
-            archive 2>&1 | tee "$LOG"
+            -verbose archive 2>&1 | tee "$LOG"
           RC=${PIPESTATUS[0]}
-          gzip "$LOG" && mv "$LOG.gz" /tmp/build_log.gz
+          gzip "$LOG" || true
+          mv "$LOG.gz" /tmp/build_log.gz 2>/dev/null || true
           if [ $RC -ne 0 ]; then
-            set +e
-            echo "=== BUILD LOG (error lines) ==="
-            gzip -dc /tmp/build_log.gz 2>/dev/null | grep -i "error:" | head -20
-            echo "=== BUILD LOG (last 30 lines) ==="
-            gzip -dc /tmp/build_log.gz 2>/dev/null | tail -30
-            echo "=== BUILD LOG (first 20 lines) ==="
-            gzip -dc /tmp/build_log.gz 2>/dev/null | head -20
-            set -e
+            LOGFILE="$LOG"
+            if [ -f /tmp/build_log.gz ]; then
+              set +x
+              echo "=== BUILD LOG (error lines) ==="
+              gzip -dc /tmp/build_log.gz 2>/dev/null | grep -iE '(error:|failed:|BUILD FAILED|ARCHIVE FAILED|fatal:)' | head -30
+              echo "=== BUILD LOG (last 40 lines) ==="
+              gzip -dc /tmp/build_log.gz 2>/dev/null | tail -40
+              echo "=== BUILD LOG (full) ==="
+              gzip -dc /tmp/build_log.gz 2>/dev/null | head -200
+            fi
             exit $RC
           fi
 
