@@ -391,7 +391,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                 for src in validSources {
                     guard let srcUrl = src.bookSourceUrl else { continue }
                     group.addTask {
-                        let t = Task {
+                        let t = Task<(SearchResult?, TimeInterval, String?), Error> {
                             let start = CFAbsoluteTimeGetCurrent()
                             let all = try await NetworkService.shared.searchOnSource(bookName: bookName, sourceUrl: srcUrl, timeout: 8)
                             let elapsed = CFAbsoluteTimeGetCurrent() - start

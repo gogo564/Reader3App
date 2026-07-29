@@ -25,23 +25,10 @@ jobs:
           xcodebuild -project Reader3App.xcodeproj -scheme Reader3App -destination generic/platform=iOS \
             -archivePath /tmp/Reader3App.xcarchive \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
-            -verbose archive 2>&1 | tee "$LOG"
+            archive 2>&1 | tee "$LOG"
           RC=${PIPESTATUS[0]}
-          gzip "$LOG" || true
-          mv "$LOG.gz" /tmp/build_log.gz 2>/dev/null || true
-          if [ $RC -ne 0 ]; then
-            LOGFILE="$LOG"
-            if [ -f /tmp/build_log.gz ]; then
-              set +x
-              echo "=== BUILD LOG (error lines) ==="
-              gzip -dc /tmp/build_log.gz 2>/dev/null | grep -iE '(error:|failed:|BUILD FAILED|ARCHIVE FAILED|fatal:)' | head -30
-              echo "=== BUILD LOG (last 40 lines) ==="
-              gzip -dc /tmp/build_log.gz 2>/dev/null | tail -40
-              echo "=== BUILD LOG (full) ==="
-              gzip -dc /tmp/build_log.gz 2>/dev/null | head -200
-            fi
-            exit $RC
-          fi
+          gzip "$LOG" && mv "$LOG.gz" /tmp/build_log.gz
+          [ $RC -eq 0 ] || exit $RC
 
       - name: Upload build log
         if: failure()
