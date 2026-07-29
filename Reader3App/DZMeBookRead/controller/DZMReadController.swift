@@ -375,9 +375,9 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
             }
 
             let maxResults = 6
-            let searchTimeout: UInt64 = 3_000_000_000
-            let chapterTimeout: TimeInterval = 3
-            let totalTimeout: TimeInterval = 15
+            let searchTimeout: UInt64 = 6_000_000_000
+            let chapterTimeout: TimeInterval = 6
+            let totalTimeout: TimeInterval = 20
             let batchSize = 20
             let bookNameLower = bookName.trimmingCharacters(in: .whitespaces).lowercased()
             let startTime = CFAbsoluteTimeGetCurrent()
@@ -404,7 +404,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                         guard let srcUrl = src.bookSourceUrl else { continue }
                         group.addTask {
                             let searchTask = Task {
-                                try await NetworkService.shared.searchOnSource(bookName: bookName, sourceUrl: srcUrl, timeout: 3)
+                                try await NetworkService.shared.searchOnSource(bookName: bookName, sourceUrl: srcUrl, timeout: 6)
                             }
                             Task {
                                 try await Task.sleep(nanoseconds: searchTimeout)
