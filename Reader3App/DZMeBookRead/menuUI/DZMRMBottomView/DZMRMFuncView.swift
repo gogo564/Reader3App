@@ -71,9 +71,7 @@ class DZMRMFuncView: DZMRMBaseView {
     }
 
     @objc private func clickTTS() {
-        readMenu.showTopView(isShow: false)
-        readMenu.showBottomView(isShow: false)
-        readMenu.showTTSView(isShow: true)
+        readMenu?.delegate?.readMenuClickTTS?(readMenu: readMenu)
     }
 
     func updateDNButton() {

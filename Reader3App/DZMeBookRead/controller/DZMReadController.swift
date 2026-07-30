@@ -38,6 +38,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     private var ttsSpeed: Float = 1.0
     private var ttsPlaying: Bool = false
     private var ttsHasStarted: Bool = false
+    private var ttsStopped: Bool = false
 
     override func viewDidLoad() {
         
@@ -94,7 +95,13 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         
         saveReadingProgress()
 
-        stopTTS()
+        ttsStopped = true
+        if ttsSynthesizer.isPaused {
+            ttsSynthesizer.continueSpeaking()
+        }
+        ttsSynthesizer.stopSpeaking(at: .immediate)
+        ttsPlaying = false
+        ttsHasStarted = false
     }
     
     private func saveReadingProgress() {
@@ -656,31 +663,42 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     }
 
     private func stopTTS() {
+        ttsStopped = true
+        if ttsSynthesizer.isPaused {
+            ttsSynthesizer.continueSpeaking()
+        }
         ttsSynthesizer.stopSpeaking(at: .immediate)
         ttsPlaying = false
         ttsHasStarted = false
-        readMenu.ttsView.isPlaying = false
+        readMenu?.ttsView?.isPlaying = false
     }
 
     private func restartTTS() {
+        ttsStopped = true
         ttsSynthesizer.stopSpeaking(at: .immediate)
         ttsPlaying = false
         ttsHasStarted = false
+        ttsStopped = false
         startTTS()
     }
 
     // MARK: -- AVSpeechSynthesizerDelegate
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        guard !ttsStopped else { return }
         guard !readModel.recordModel.isLastChapter else {
             ttsPlaying = false
-            readMenu.ttsView.isPlaying = false
+            readMenu?.ttsView?.isPlaying = false
             return
         }
         let nextID = readModel.recordModel.chapterModel.nextChapterID!
         navigateToChapter(chapterID: nextID) { [weak self] in
             self?.startTTS()
         }
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        ttsStopped = true
     }
 
     private func navigateToChapter(chapterID: NSNumber, completion: @escaping () -> Void) {
@@ -753,6 +771,10 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     
     deinit {
         
+        ttsStopped = true
+        if ttsSynthesizer.isPaused {
+            ttsSynthesizer.continueSpeaking()
+        }
         ttsSynthesizer.stopSpeaking(at: .immediate)
         ttsSynthesizer.delegate = nil
         ttsPlaying = false
