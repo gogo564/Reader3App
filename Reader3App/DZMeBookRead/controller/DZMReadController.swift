@@ -602,8 +602,12 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     func ttsView(_ ttsView: DZMRMTTSView, didChangeSpeed speed: Float) {
         ttsSpeed = speed
-        if ttsPlaying {
+        if ttsPlaying || ttsHasStarted {
+            let wasPlaying = ttsPlaying
             restartTTS()
+            if !wasPlaying {
+                pauseTTS()
+            }
         }
     }
 
@@ -611,8 +615,12 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         ttsVoice = voice
         UserDefaults.standard.set(voice.name, forKey: TTS_VOICE_NAME_KEY)
         UserDefaults.standard.set(voice.language, forKey: TTS_VOICE_LANG_KEY)
-        if ttsPlaying {
+        if ttsPlaying || ttsHasStarted {
+            let wasPlaying = ttsPlaying
             restartTTS()
+            if !wasPlaying {
+                pauseTTS()
+            }
         }
     }
 
@@ -639,6 +647,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate * ttsSpeed
         utterance.volume = 1.0
 
+        ttsStopped = false
         ttsSynthesizer.speak(utterance)
         ttsPlaying = true
         ttsHasStarted = true
@@ -678,7 +687,6 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         ttsSynthesizer.stopSpeaking(at: .immediate)
         ttsPlaying = false
         ttsHasStarted = false
-        ttsStopped = false
         startTTS()
     }
 
