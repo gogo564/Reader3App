@@ -28,17 +28,13 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     // MARK: -- TTS
 
-    private let TTS_VOICE_ID_KEY = "tts_voice_id"
+    private let TTS_VOICE_NAME_KEY = "tts_voice_name"
+    private let TTS_VOICE_LANG_KEY = "tts_voice_lang"
 
     private var ttsSynthesizer: AVSpeechSynthesizer = {
-        let s = AVSpeechSynthesizer()
-        return s
+        AVSpeechSynthesizer()
     }()
-    private var ttsVoice: AVSpeechSynthesisVoice? {
-        didSet {
-            UserDefaults.standard.set(ttsVoice?.identifier, forKey: TTS_VOICE_ID_KEY)
-        }
-    }
+    private var ttsVoice: AVSpeechSynthesisVoice?
     private var ttsSpeed: Float = 1.0
     private var ttsPlaying: Bool = false
     private var ttsHasStarted: Bool = false
@@ -49,8 +45,9 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         
         ttsSynthesizer.delegate = self
 
-        if let savedId = UserDefaults.standard.string(forKey: TTS_VOICE_ID_KEY) {
-            ttsVoice = AVSpeechSynthesisVoice(identifier: savedId)
+        if let savedName = UserDefaults.standard.string(forKey: TTS_VOICE_NAME_KEY),
+           let savedLang = UserDefaults.standard.string(forKey: TTS_VOICE_LANG_KEY) {
+            ttsVoice = AVSpeechSynthesisVoice.speechVoices().first(where: { $0.name == savedName && $0.language == savedLang })
         }
         
         // 初始化书籍阅读记录
@@ -605,6 +602,8 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     func ttsView(_ ttsView: DZMRMTTSView, didSelectVoice voice: AVSpeechSynthesisVoice) {
         ttsVoice = voice
+        UserDefaults.standard.set(voice.name, forKey: TTS_VOICE_NAME_KEY)
+        UserDefaults.standard.set(voice.language, forKey: TTS_VOICE_LANG_KEY)
         if ttsPlaying {
             restartTTS()
         }
@@ -614,10 +613,19 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     private func startTTS() {
         guard let chapter = readModel.recordModel.chapterModel else { return }
-        let text = chapter.content ?? ""
-        guard !text.isEmpty else { return }
+        let fullText = chapter.content ?? ""
+        guard !fullText.isEmpty else { return }
 
-        ttsSynthesizer.stopSpeaking(at: .word)
+        ttsSynthesizer.stopSpeaking(at: .immediate)
+
+        let location = readModel.recordModel.locationFirst?.intValue ?? 0
+        let text: String
+        if location > 0 && location < fullText.utf16.count {
+            let nsText = fullText as NSString
+            text = nsText.substring(from: location)
+        } else {
+            text = fullText
+        }
 
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = ttsVoice ?? AVSpeechSynthesisVoice(language: "zh-CN")
@@ -648,14 +656,16 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     }
 
     private func stopTTS() {
-        ttsSynthesizer.stopSpeaking(at: .word)
+        ttsSynthesizer.stopSpeaking(at: .immediate)
         ttsPlaying = false
         ttsHasStarted = false
         readMenu.ttsView.isPlaying = false
     }
 
     private func restartTTS() {
-        stopTTS()
+        ttsSynthesizer.stopSpeaking(at: .immediate)
+        ttsPlaying = false
+        ttsHasStarted = false
         startTTS()
     }
 
@@ -743,7 +753,10 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     
     deinit {
         
-        stopTTS()
+        ttsSynthesizer.stopSpeaking(at: .immediate)
+        ttsSynthesizer.delegate = nil
+        ttsPlaying = false
+        ttsHasStarted = false
         
         // 移除阅读长按视图监控
         DZM_READ_NOTIFICATION_REMOVE(target: self)
