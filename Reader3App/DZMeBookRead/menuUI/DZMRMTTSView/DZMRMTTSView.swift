@@ -47,6 +47,10 @@ class DZMRMTTSView: DZMRMBaseView {
         }
     }
 
+    func setVoiceName(_ name: String) {
+        voiceButton.setTitle(name, for: .normal)
+    }
+
     override init(frame: CGRect) { super.init(frame: frame) }
 
     override func addSubviews() {

@@ -28,19 +28,30 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     // MARK: -- TTS
 
+    private let TTS_VOICE_ID_KEY = "tts_voice_id"
+
     private var ttsSynthesizer: AVSpeechSynthesizer = {
         let s = AVSpeechSynthesizer()
         return s
     }()
-    private var ttsVoice: AVSpeechSynthesisVoice?
+    private var ttsVoice: AVSpeechSynthesisVoice? {
+        didSet {
+            UserDefaults.standard.set(ttsVoice?.identifier, forKey: TTS_VOICE_ID_KEY)
+        }
+    }
     private var ttsSpeed: Float = 1.0
     private var ttsPlaying: Bool = false
+    private var ttsHasStarted: Bool = false
 
     override func viewDidLoad() {
         
         super.viewDidLoad()
         
         ttsSynthesizer.delegate = self
+
+        if let savedId = UserDefaults.standard.string(forKey: TTS_VOICE_ID_KEY) {
+            ttsVoice = AVSpeechSynthesisVoice(identifier: savedId)
+        }
         
         // 初始化书籍阅读记录
         updateReadRecord(recordModel: readModel.recordModel)
@@ -383,6 +394,9 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         readMenu.showBottomView(isShow: false)
         readMenu.showTTSView(isShow: true)
         readMenu.ttsView.chapterName = readModel.recordModel.chapterModel.name ?? ""
+        if let voice = ttsVoice {
+            readMenu.ttsView.setVoiceName(voice.name)
+        }
     }
 
     /// 点击换源
@@ -559,8 +573,10 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     func ttsViewDidTapPlayPause(_ ttsView: DZMRMTTSView) {
         if ttsPlaying {
             pauseTTS()
-        } else {
+        } else if ttsHasStarted {
             resumeTTS()
+        } else {
+            startTTS()
         }
     }
 
@@ -610,6 +626,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
         ttsSynthesizer.speak(utterance)
         ttsPlaying = true
+        ttsHasStarted = true
 
         readMenu.ttsView.isPlaying = true
         readMenu.ttsView.chapterName = chapter.name ?? ""
@@ -633,6 +650,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     private func stopTTS() {
         ttsSynthesizer.stopSpeaking(at: .word)
         ttsPlaying = false
+        ttsHasStarted = false
         readMenu.ttsView.isPlaying = false
     }
 
@@ -724,6 +742,8 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     }
     
     deinit {
+        
+        stopTTS()
         
         // 移除阅读长按视图监控
         DZM_READ_NOTIFICATION_REMOVE(target: self)
