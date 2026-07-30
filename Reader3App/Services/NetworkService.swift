@@ -161,7 +161,7 @@ final class NetworkService: @unchecked Sendable {
             book = books.first(where: { $0.bookUrl == bookUrl })
         }
         guard var b = book else {
-            let b = Book(bookUrl: bookUrl, name: bookName ?? "", author: nil, durChapterTitle: title, durChapterIndex: index, durChapterTime: time, durChapterPos: pos)
+            let b = Book(bookUrl: bookUrl, name: bookName ?? "", author: nil, durChapterTitle: title, durChapterIndex: index, durChapterPos: pos, durChapterTime: time)
             _ = try await saveBook(b)
             return
         }

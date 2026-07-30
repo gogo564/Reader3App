@@ -106,7 +106,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                     var book = cached.withProgress(index: index, title: title, time: time, pos: pos)
                     _ = try? await NetworkService.shared.saveBook(book)
                 } else {
-                    let book = Book(bookUrl: bookUrl, name: bookName, author: nil, durChapterTitle: title, durChapterIndex: index, durChapterTime: time, durChapterPos: pos)
+                    let book = Book(bookUrl: bookUrl, name: bookName, author: nil, durChapterTitle: title, durChapterIndex: index, durChapterPos: pos, durChapterTime: time)
                     _ = try? await NetworkService.shared.saveBook(book)
                 }
             }

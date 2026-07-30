@@ -115,7 +115,7 @@ class CacheManager {
         if let idx = books.firstIndex(where: { $0.bookUrl == bookUrl }) {
             books[idx] = books[idx].withProgress(index: index, title: chapterTitle, time: time, pos: pos)
         } else {
-            let b = Book(bookUrl: bookUrl, name: bookName, author: nil, durChapterTitle: chapterTitle, durChapterIndex: index, durChapterTime: time, durChapterPos: pos)
+            let b = Book(bookUrl: bookUrl, name: bookName, author: nil, durChapterTitle: chapterTitle, durChapterIndex: index, durChapterPos: pos, durChapterTime: time)
             books.append(b)
         }
         cacheBookshelf(books)
