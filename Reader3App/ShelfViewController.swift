@@ -235,7 +235,7 @@ class ShelfViewController: UIViewController {
                     guard let c = cached.first(where: { $0.bookUrl == server.bookUrl }),
                           let localTime = c.durChapterTime else { return server }
                     if (server.durChapterTime ?? 0) < localTime {
-                        return server.withProgress(index: c.durChapterIndex ?? 0, title: c.durChapterTitle, time: localTime)
+                        return server.withProgress(index: c.durChapterIndex ?? 0, title: c.durChapterTitle, time: localTime, pos: c.durChapterPos)
                     }
                     return server
                 }
@@ -269,7 +269,7 @@ class ShelfViewController: UIViewController {
                     guard let c = cached.first(where: { $0.bookUrl == server.bookUrl }),
                           let localTime = c.durChapterTime else { return server }
                     if (server.durChapterTime ?? 0) < localTime {
-                        return server.withProgress(index: c.durChapterIndex ?? 0, title: c.durChapterTitle, time: localTime)
+                        return server.withProgress(index: c.durChapterIndex ?? 0, title: c.durChapterTitle, time: localTime, pos: c.durChapterPos)
                     }
                     return server
                 }
