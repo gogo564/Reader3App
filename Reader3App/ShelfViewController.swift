@@ -370,6 +370,9 @@ class ShelfViewController: UIViewController {
                     else { chapterModel.nextChapterID = DZM_READ_NO_MORE_CHAPTER }
                     chapterModel.updateFont()
                     recordModel.chapterModel = chapterModel
+                    if let pos = currentBook.durChapterPos, pos > 0 {
+                        recordModel.modify(chapterID: chapterModel.id, location: pos)
+                    }
                     readModel.recordModel = recordModel
 
                     readModel.chapterListModels.removeAll()
@@ -428,6 +431,9 @@ class ShelfViewController: UIViewController {
                             let rm = DZMReadRecordModel()
                             rm.bookID = currentBook.bookUrl
                             rm.chapterModel = cm
+                            if let pos = currentBook.durChapterPos, pos > 0 {
+                                rm.modify(chapterID: cm.id, location: pos)
+                            }
                             readModel.recordModel = rm
                             readController.readModel = readModel
                             navigationController?.pushViewController(readController, animated: true)
@@ -452,6 +458,9 @@ class ShelfViewController: UIViewController {
                             let rm = DZMReadRecordModel()
                             rm.bookID = currentBook.bookUrl
                             rm.chapterModel = cm
+                            if let pos = currentBook.durChapterPos, pos > 0 {
+                                rm.modify(chapterID: cm.id, location: pos)
+                            }
                             readModel.recordModel = rm
                             readController.readModel = readModel
                             navigationController?.pushViewController(readController, animated: true)

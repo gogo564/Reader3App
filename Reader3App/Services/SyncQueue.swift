@@ -64,7 +64,8 @@ class SyncQueue: NSObject {
             let title = dict["durChapterTitle"] as? String
             let bookName = dict["bookName"] as? String
             let time = dict["durChapterTime"] as? Int64 ?? Int64(Date().timeIntervalSince1970 * 1000)
-            try await NetworkService.shared.saveBookProgress(bookUrl: url, index: index, title: title, bookName: bookName, time: time)
+            let pos = dict["durChapterPos"] as? Int
+            try await NetworkService.shared.saveBookProgress(bookUrl: url, index: index, title: title, bookName: bookName, time: time, pos: pos)
         case .saveBookmark:
             let item = try JSONDecoder().decode(BookmarkItem.self, from: op.payload)
             try await NetworkService.shared.saveBookmark(item)

@@ -110,12 +110,12 @@ class CacheManager {
         try? content.write(to: f, atomically: true, encoding: .utf8)
     }
 
-    func updateBookProgress(bookUrl: String, bookName: String, index: Int, chapterTitle: String?, time: Int64) {
+    func updateBookProgress(bookUrl: String, bookName: String, index: Int, chapterTitle: String?, time: Int64, pos: Int? = nil) {
         var books = getCachedBookshelf() ?? []
         if let idx = books.firstIndex(where: { $0.bookUrl == bookUrl }) {
-            books[idx] = books[idx].withProgress(index: index, title: chapterTitle, time: time)
+            books[idx] = books[idx].withProgress(index: index, title: chapterTitle, time: time, pos: pos)
         } else {
-            let b = Book(bookUrl: bookUrl, name: bookName, author: nil, durChapterTitle: chapterTitle, durChapterIndex: index, durChapterTime: time)
+            let b = Book(bookUrl: bookUrl, name: bookName, author: nil, durChapterTitle: chapterTitle, durChapterIndex: index, durChapterTime: time, durChapterPos: pos)
             books.append(b)
         }
         cacheBookshelf(books)

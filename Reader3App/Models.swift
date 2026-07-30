@@ -110,14 +110,14 @@ struct Book: Codable, Identifiable, Hashable {
         return URL(string: base + c)
     }
 
-    func withProgress(index: Int, title: String?, time: Int64) -> Book {
+    func withProgress(index: Int, title: String?, time: Int64, pos: Int? = nil) -> Book {
         Book(bookUrl: bookUrl, name: name, author: author, kind: kind,
              coverUrl: coverUrl, customCoverUrl: customCoverUrl,
              origin: origin, originName: originName, intro: intro,
              totalChapterNum: totalChapterNum, order: order,
              durChapterTitle: title ?? durChapterTitle,
              durChapterIndex: index,
-             durChapterPos: durChapterPos,
+             durChapterPos: pos ?? durChapterPos,
              durChapterTime: time,
              latestChapterTitle: latestChapterTitle, wordCount: wordCount,
              type: type, group: group, tocUrl: tocUrl,
