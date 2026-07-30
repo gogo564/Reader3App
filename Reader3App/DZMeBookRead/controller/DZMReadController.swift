@@ -565,7 +565,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     func ttsViewDidTapPrevious(_ ttsView: DZMRMTTSView) {
         guard !readModel.recordModel.isFirstChapter else { return }
-        let prevID = readModel.recordModel.chapterModel.previousChapterID
+        let prevID = readModel.recordModel.chapterModel.previousChapterID!
         navigateToChapter(chapterID: prevID) { [weak self] in
             self?.startTTS()
         }
@@ -573,7 +573,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     func ttsViewDidTapNext(_ ttsView: DZMRMTTSView) {
         guard !readModel.recordModel.isLastChapter else { return }
-        let nextID = readModel.recordModel.chapterModel.nextChapterID
+        let nextID = readModel.recordModel.chapterModel.nextChapterID!
         navigateToChapter(chapterID: nextID) { [weak self] in
             self?.startTTS()
         }
@@ -648,7 +648,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
             readMenu.ttsView.isPlaying = false
             return
         }
-        let nextID = readModel.recordModel.chapterModel.nextChapterID
+        let nextID = readModel.recordModel.chapterModel.nextChapterID!
         navigateToChapter(chapterID: nextID) { [weak self] in
             self?.startTTS()
         }

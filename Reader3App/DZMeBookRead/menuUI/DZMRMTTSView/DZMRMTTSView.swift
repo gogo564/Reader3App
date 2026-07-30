@@ -177,7 +177,7 @@ class DZMRMTTSView: DZMRMBaseView {
         let alert = UIAlertController(title: "选择语音", message: nil, preferredStyle: .actionSheet)
         for v in voices {
             let name = "\(v.name) (\(v.language))"
-            alert.addAction(UIAlertAction(title: name, style: .default, { [weak self] _ in
+            alert.addAction(UIAlertAction(title: name, style: .default, handler: { [weak self] _ in
                 guard let self = self else { return }
                 self.ttsDelegate?.ttsView?(self, didSelectVoice: v)
                 self.voiceButton.setTitle(v.name, for: .normal)
