@@ -134,6 +134,13 @@ class CacheManager {
                 print("[CacheManager] clearCache failed: \(error)")
             }
         }
+        let coverF = coverDir.appendingPathComponent("\(stableKey(bookUrl)).jpg")
+        if FileManager.default.fileExists(atPath: coverF.path) {
+            try? FileManager.default.removeItem(at: coverF)
+        }
+        var books = getCachedBookshelf() ?? []
+        books.removeAll { $0.bookUrl == bookUrl }
+        cacheBookshelf(books)
         UserDefaults.standard.removeObject(forKey: totalKey(bookUrl))
     }
 }
