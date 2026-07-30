@@ -115,22 +115,15 @@ class DZMReadConfigure: NSObject {
     
     /// 状态栏字体颜色
     var statusTextColor:UIColor! {
-        
-        // 固定颜色
+        // C: 夜间模式用半透明白 RGB(180,180,180)，日间用 RGB(80,80,80)
+        if bgColorIndex.intValue == 4 { return RGB(180, 180, 180) }
         return RGB(80, 80, 80)
         
-        // 根据背景颜色选择
+        // B: 根据背景颜色选择
 //        return DZM_READ_STATUS_TEXT_COLORS[bgColorIndex.intValue]
         
         // 字体颜色列表选择
 //         return DZM_READ_STATUS_TEXT_COLORS[statusTextColorIndex.intValue]
-        
-        // 日夜间切换
-//         if DZMUserDefaults.bool(DZM_READ_KEY_MODE_DAY_NIGHT) {
-//
-//            return DZM_COLOR_145_145_145
-//
-//         }else{ return DZM_COLOR_145_145_145 }
     }
     
     /// 行间距(请设置整数,因为需要比较是否需要重新分页,小数点没法判断相等)
