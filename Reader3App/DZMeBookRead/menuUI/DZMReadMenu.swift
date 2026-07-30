@@ -66,6 +66,9 @@ import UIKit
 
     /// 点击换源
     @objc optional func readMenuClickSwitchSource(readMenu:DZMReadMenu!)
+
+    /// 点击朗读
+    @objc optional func readMenuClickTTS(readMenu:DZMReadMenu!)
 }
 
 class DZMReadMenu: NSObject,UIGestureRecognizerDelegate {
@@ -93,6 +96,9 @@ class DZMReadMenu: NSObject,UIGestureRecognizerDelegate {
     
     /// SettingView
     private(set) var settingView:DZMRMSettingView!
+    
+    /// TTSView
+    private(set) var ttsView:DZMRMTTSView!
     
     /// 日夜间遮盖
     private(set) var cover:UIView!
@@ -134,6 +140,9 @@ class DZMReadMenu: NSObject,UIGestureRecognizerDelegate {
         // 初始化SettingView
         initSettingView()
         
+        // 初始化TTSView
+        initTTSView()
+        
         // 初始化BottomView
         initBottomView()
     }
@@ -159,7 +168,7 @@ class DZMReadMenu: NSObject,UIGestureRecognizerDelegate {
     // MARK: -- UIGestureRecognizerDelegate
     
     /// 点击这些控件不需要执行手势
-    private let ClassStrings:[String] = ["DZMRMTopView","DZMRMBottomView","DZMRMSettingView","DZMRMFontSizeView", "DZMRMFontTypeView","DZMRMLightView","DZMRMSpacingView","DZMRMEffectTypeView","DZMRMBGColorView","DZMRMFuncView","DZMRMProgressView","UIControl","UISlider","ASValueTrackingSlider"]
+    private let ClassStrings:[String] = ["DZMRMTopView","DZMRMBottomView","DZMRMSettingView","DZMRMTTSView","DZMRMFontSizeView", "DZMRMFontTypeView","DZMRMLightView","DZMRMSpacingView","DZMRMEffectTypeView","DZMRMBGColorView","DZMRMFuncView","DZMRMProgressView","UIControl","UISlider","ASValueTrackingSlider"]
     
     /// 手势拦截
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
@@ -261,6 +270,41 @@ class DZMReadMenu: NSObject,UIGestureRecognizerDelegate {
         settingView.frame = CGRect(x: 0, y: DZM_READ_CONTENT_VIEW_HEIGHT, width: DZM_READ_CONTENT_VIEW_WIDTH, height: DZM_READ_MENU_SETTING_VIEW_TOTAL_HEIGHT)
     }
     
+    // MARK: -- TTSView
+    
+    /// 初始化TTSView
+    private func initTTSView() {
+        
+        ttsView = DZMRMTTSView(readMenu: self)
+        
+        ttsView.isHidden = true
+        
+        ttsView.ttsDelegate = vc
+        
+        contentView.addSubview(ttsView)
+        
+        ttsView.frame = CGRect(x: 0, y: DZM_READ_CONTENT_VIEW_HEIGHT, width: DZM_READ_CONTENT_VIEW_WIDTH, height: DZM_READ_MENU_TTS_VIEW_TOTAL_HEIGHT)
+    }
+    
+    /// TTSView展示
+    func showTTSView(isShow:Bool, completion:DZMAnimationCompletion? = nil) {
+        
+        if isShow { ttsView.isHidden = false }
+        
+        UIView.animate(withDuration: DZM_READ_AD_TIME, delay: 0, options: .curveEaseOut, animations: { [weak self] () in
+            
+            let y = isShow ? (DZM_READ_CONTENT_VIEW_HEIGHT - DZM_READ_MENU_TTS_VIEW_TOTAL_HEIGHT) : DZM_READ_CONTENT_VIEW_HEIGHT
+            
+            self?.ttsView.frame.origin = CGPoint(x: 0, y: y)
+            
+        }) { [weak self] (isOK) in
+            
+            if !isShow { self?.ttsView.isHidden = true }
+            
+            completion?()
+        }
+    }
+    
     // MARK: 菜单展示
     
     /// 动画是否完成
@@ -281,6 +325,8 @@ class DZMReadMenu: NSObject,UIGestureRecognizerDelegate {
         showBottomView(isShow: isShow)
 
         showSettingView(isShow: false)
+
+        showTTSView(isShow: false)
         
         showTopView(isShow: isShow) { [weak self] () in
             

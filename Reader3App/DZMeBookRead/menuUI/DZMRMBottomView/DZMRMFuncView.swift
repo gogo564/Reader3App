@@ -6,6 +6,7 @@ class DZMRMFuncView: DZMRMBaseView {
     private var switchSource:UIButton!
     private var dn:UIButton!
     private var setting:UIButton!
+    private var tts:UIButton!
 
     override init(frame: CGRect) { super.init(frame: frame) }
 
@@ -40,6 +41,12 @@ class DZMRMFuncView: DZMRMBaseView {
         setting.addTarget(self, action: #selector(clickSetting), for: .touchUpInside)
         setting.tintColor = DZM_READ_COLOR_MENU_COLOR
         addSubview(setting)
+
+        tts = UIButton(type: .custom)
+        tts.setImage(UIImage(systemName: "speaker.wave.2.fill")?.withRenderingMode(.alwaysTemplate), for: .normal)
+        tts.addTarget(self, action: #selector(clickTTS), for: .touchUpInside)
+        tts.tintColor = DZM_READ_COLOR_MENU_COLOR
+        addSubview(tts)
     }
 
     @objc private func clickCatalogue() {
@@ -63,6 +70,12 @@ class DZMRMFuncView: DZMRMBaseView {
         readMenu.showSettingView(isShow: true)
     }
 
+    @objc private func clickTTS() {
+        readMenu.showTopView(isShow: false)
+        readMenu.showBottomView(isShow: false)
+        readMenu.showTTSView(isShow: true)
+    }
+
     func updateDNButton() {
         if dn.isSelected { dn.tintColor = DZM_READ_COLOR_MAIN
         }else{ dn.tintColor = DZM_READ_COLOR_MENU_COLOR }
@@ -71,11 +84,12 @@ class DZMRMFuncView: DZMRMBaseView {
     override func layoutSubviews() {
         super.layoutSubviews()
         let wh = frame.size.height
-        let spacing = (frame.size.width - wh * 4) / 5
+        let spacing = (frame.size.width - wh * 5) / 6
         catalogue.frame = CGRect(x: spacing, y: DZM_SPACE_SA_3, width: wh, height: wh)
         switchSource.frame = CGRect(x: spacing * 2 + wh, y: DZM_SPACE_SA_3, width: wh, height: wh)
-        dn.frame = CGRect(x: spacing * 3 + wh * 2, y: DZM_SPACE_SA_3, width: wh, height: wh)
-        setting.frame = CGRect(x: spacing * 4 + wh * 3, y: DZM_SPACE_SA_3, width: wh, height: wh)
+        tts.frame = CGRect(x: spacing * 3 + wh * 2, y: DZM_SPACE_SA_3, width: wh, height: wh)
+        dn.frame = CGRect(x: spacing * 4 + wh * 3, y: DZM_SPACE_SA_3, width: wh, height: wh)
+        setting.frame = CGRect(x: spacing * 5 + wh * 4, y: DZM_SPACE_SA_3, width: wh, height: wh)
     }
 
     required init?(coder aDecoder: NSCoder) {

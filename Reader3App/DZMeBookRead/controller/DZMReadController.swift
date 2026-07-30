@@ -7,8 +7,9 @@
 //
 
 import UIKit
+import AVFoundation
 
-class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControllerDelegate,UIPageViewControllerDataSource,DZMCoverControllerDelegate,DZMReadContentViewDelegate,DZMReadCatalogViewDelegate,DZMReadMarkViewDelegate {
+class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControllerDelegate,UIPageViewControllerDataSource,DZMCoverControllerDelegate,DZMReadContentViewDelegate,DZMReadCatalogViewDelegate,DZMReadMarkViewDelegate,DZMRMTTSViewDelegate,AVSpeechSynthesizerDelegate {
 
     var readModel: DZMReadModel!
     var chapterList: ((_ bookUrl: String) async throws -> [Chapter])?
@@ -24,10 +25,22 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     var tempNumber: NSInteger = 1
     var catalogChapters: [Chapter] = []
     var bookAuthor: String?
-    
+
+    // MARK: -- TTS
+
+    private var ttsSynthesizer: AVSpeechSynthesizer = {
+        let s = AVSpeechSynthesizer()
+        return s
+    }()
+    private var ttsVoice: AVSpeechSynthesisVoice?
+    private var ttsSpeed: Float = 1.0
+    private var ttsPlaying: Bool = false
+
     override func viewDidLoad() {
         
         super.viewDidLoad()
+        
+        ttsSynthesizer.delegate = self
         
         // 初始化书籍阅读记录
         updateReadRecord(recordModel: readModel.recordModel)
@@ -72,6 +85,8 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         autoSaveTimer = nil
         
         saveReadingProgress()
+
+        stopTTS()
     }
     
     private func saveReadingProgress() {
@@ -361,6 +376,14 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         creatPageController(displayController: GetCurrentReadViewController())
     }
 
+    /// 点击朗读
+    func readMenuClickTTS(readMenu: DZMReadMenu!) {
+        readMenu.showTopView(isShow: false)
+        readMenu.showBottomView(isShow: false)
+        readMenu.showTTSView(isShow: true)
+        readMenu.ttsView.chapterName = readModel.recordModel.chapterModel.name ?? ""
+    }
+
     /// 点击换源
     func readMenuClickSwitchSource(readMenu: DZMReadMenu!) {
         readMenu.showMenu(isShow: false)
@@ -521,6 +544,141 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         UIView.animate(withDuration: 0.25) { lbl.alpha = 1 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             UIView.animate(withDuration: 0.25) { lbl.alpha = 0 } completion: { _ in lbl.removeFromSuperview() }
+        }
+    }
+
+    // MARK: -- DZMRMTTSViewDelegate
+
+    func ttsViewDidTapClose(_ ttsView: DZMRMTTSView) {
+        stopTTS()
+        readMenu.showTTSView(isShow: false)
+        readMenu.showMenu(isShow: true)
+    }
+
+    func ttsViewDidTapPlayPause(_ ttsView: DZMRMTTSView) {
+        if ttsPlaying {
+            pauseTTS()
+        } else {
+            resumeTTS()
+        }
+    }
+
+    func ttsViewDidTapPrevious(_ ttsView: DZMRMTTSView) {
+        guard !readModel.recordModel.isFirstChapter else { return }
+        let prevID = readModel.recordModel.chapterModel.previousChapterID
+        navigateToChapter(chapterID: prevID) { [weak self] in
+            self?.startTTS()
+        }
+    }
+
+    func ttsViewDidTapNext(_ ttsView: DZMRMTTSView) {
+        guard !readModel.recordModel.isLastChapter else { return }
+        let nextID = readModel.recordModel.chapterModel.nextChapterID
+        navigateToChapter(chapterID: nextID) { [weak self] in
+            self?.startTTS()
+        }
+    }
+
+    func ttsView(_ ttsView: DZMRMTTSView, didChangeSpeed speed: Float) {
+        ttsSpeed = speed
+        if ttsPlaying {
+            restartTTS()
+        }
+    }
+
+    func ttsView(_ ttsView: DZMRMTTSView, didSelectVoice voice: AVSpeechSynthesisVoice) {
+        ttsVoice = voice
+        if ttsPlaying {
+            restartTTS()
+        }
+    }
+
+    // MARK: -- TTS 控制
+
+    private func startTTS() {
+        guard let chapter = readModel.recordModel.chapterModel else { return }
+        let text = chapter.content ?? ""
+        guard !text.isEmpty else { return }
+
+        ttsSynthesizer.stopSpeaking(at: .word)
+
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = ttsVoice ?? AVSpeechSynthesisVoice(language: "zh-CN")
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * ttsSpeed
+        utterance.volume = 1.0
+
+        ttsSynthesizer.speak(utterance)
+        ttsPlaying = true
+
+        readMenu.ttsView.isPlaying = true
+        readMenu.ttsView.chapterName = chapter.name ?? ""
+
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [])
+        try? AVAudioSession.sharedInstance().setActive(true)
+    }
+
+    private func pauseTTS() {
+        ttsSynthesizer.pauseSpeaking(at: .word)
+        ttsPlaying = false
+        readMenu.ttsView.isPlaying = false
+    }
+
+    private func resumeTTS() {
+        ttsSynthesizer.continueSpeaking()
+        ttsPlaying = true
+        readMenu.ttsView.isPlaying = true
+    }
+
+    private func stopTTS() {
+        ttsSynthesizer.stopSpeaking(at: .word)
+        ttsPlaying = false
+        readMenu.ttsView.isPlaying = false
+    }
+
+    private func restartTTS() {
+        stopTTS()
+        startTTS()
+    }
+
+    // MARK: -- AVSpeechSynthesizerDelegate
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        guard !readModel.recordModel.isLastChapter else {
+            ttsPlaying = false
+            readMenu.ttsView.isPlaying = false
+            return
+        }
+        let nextID = readModel.recordModel.chapterModel.nextChapterID
+        navigateToChapter(chapterID: nextID) { [weak self] in
+            self?.startTTS()
+        }
+    }
+
+    private func navigateToChapter(chapterID: NSNumber, completion: @escaping () -> Void) {
+        let index = chapterID.intValue
+        let bookUrl = readModel.bookID ?? ""
+
+        GoToChapter(chapterID: chapterID)
+        readMenu.topView.checkForMark()
+        readMenu.bottomView.progressView.reloadProgress()
+
+        if let cm = readModel.recordModel.chapterModel, cm.id == chapterID, let c = cm.content, !c.isEmpty {
+            completion()
+            return
+        }
+
+        toast("正在加载章节...")
+        Task {
+            do {
+                let raw = try await chapterContent?(bookUrl, index) ?? ""
+                let content = DZMReadParser.contentTypesetting(content: raw)
+                await MainActor.run {
+                    readModel.recordModel.chapterModel.content = content
+                    completion()
+                }
+            } catch {
+                await MainActor.run { self.toast("加载失败") }
+            }
         }
     }
 
