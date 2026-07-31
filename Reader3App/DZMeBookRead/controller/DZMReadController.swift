@@ -141,6 +141,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         let time = Int64(Date().timeIntervalSince1970 * 1000)
 
         if NetworkMonitor.shared.isConnected {
+            guard !AppState.shared.isDeleted(bookUrl: bookUrl) else { return }
             Task {
                 if let cached = CacheManager.shared.findCachedBook(bookUrl: bookUrl) {
                     _ = try? await NetworkService.shared.saveBook(cached.withChapterProgress(index: index, title: title, time: time))

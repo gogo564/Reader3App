@@ -9,7 +9,6 @@ class ShelfViewController: UIViewController {
     private let networkBar = UIView()
     private let networkLabel = UILabel()
     private let networkDot = UIView()
-    private let pendingLabel = UILabel()
     private var cacheManageVC: CacheManageViewController?
     private var openingCells: [String: IndexPath] = [:]
 
@@ -46,13 +45,6 @@ class ShelfViewController: UIViewController {
         networkDot.clipsToBounds = true
         networkLabel.text = online ? "在线" : "离线"
         networkLabel.textColor = online ? .darkText : .systemRed
-        let pending = SyncQueue.shared.pendingCount
-        if pending > 0 {
-            pendingLabel.text = "待同步 \(pending)"
-            pendingLabel.textColor = .systemOrange
-        } else {
-            pendingLabel.text = ""
-        }
         networkBar.backgroundColor = online
             ? UIColor(white: 1, alpha: 0.9)
             : UIColor(red: 1, green: 0.95, blue: 0.95, alpha: 0.95)
@@ -72,10 +64,6 @@ class ShelfViewController: UIViewController {
         networkLabel.translatesAutoresizingMaskIntoConstraints = false
         networkBar.addSubview(networkLabel)
 
-        pendingLabel.font = .systemFont(ofSize: 11)
-        pendingLabel.translatesAutoresizingMaskIntoConstraints = false
-        networkBar.addSubview(pendingLabel)
-
         let tap = UITapGestureRecognizer(target: self, action: #selector(showCacheManage))
         networkBar.addGestureRecognizer(tap)
 
@@ -92,9 +80,6 @@ class ShelfViewController: UIViewController {
 
             networkLabel.centerYAnchor.constraint(equalTo: networkBar.centerYAnchor),
             networkLabel.leadingAnchor.constraint(equalTo: networkDot.trailingAnchor, constant: 6),
-
-            pendingLabel.centerYAnchor.constraint(equalTo: networkBar.centerYAnchor),
-            pendingLabel.trailingAnchor.constraint(equalTo: networkBar.trailingAnchor, constant: -12),
         ])
     }
 
@@ -216,6 +201,7 @@ class ShelfViewController: UIViewController {
                         type: result.type, tocUrl: result.tocUrl)
         Task {
             do {
+                AppState.shared.clearDeleted(bookUrl: book.bookUrl)
                 _ = try await NetworkService.shared.saveBook(book)
                 var cached = CacheManager.shared.getCachedBookshelf() ?? []
                 if !cached.contains(where: { $0.bookUrl == book.bookUrl }) {
@@ -240,6 +226,7 @@ class ShelfViewController: UIViewController {
                     }
                     return server
                 }
+                books = books.filter { !AppState.shared.isDeleted(bookUrl: $0.bookUrl) }
                 CacheManager.shared.cacheBookshelf(books)
                 await AppState.shared.syncPendingDeletes()
                 await MainActor.run {
@@ -250,6 +237,7 @@ class ShelfViewController: UIViewController {
                 }
             } catch {
                 if let cached = CacheManager.shared.getCachedBookshelf() {
+                    let cached = cached.filter { !AppState.shared.isDeleted(bookUrl: $0.bookUrl) }
                     await MainActor.run {
                         self.books = cached
                         self.cacheManageVC?.updateBooks(cached)
@@ -274,6 +262,7 @@ class ShelfViewController: UIViewController {
                     }
                     return server
                 }
+                books = books.filter { !AppState.shared.isDeleted(bookUrl: $0.bookUrl) }
                 CacheManager.shared.cacheBookshelf(books)
                 await AppState.shared.syncPendingDeletes()
                 await MainActor.run {
@@ -285,6 +274,7 @@ class ShelfViewController: UIViewController {
                 }
             } catch {
                 if let cached = CacheManager.shared.getCachedBookshelf() {
+                    let cached = cached.filter { !AppState.shared.isDeleted(bookUrl: $0.bookUrl) }
                     await MainActor.run {
                         self.books = cached
                         self.cacheManageVC?.updateBooks(cached)
@@ -301,6 +291,7 @@ class ShelfViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
             guard let self = self else { return }
+            AppState.shared.markDeleted(bookUrl: book.bookUrl)
             self.books.removeAll { $0.bookUrl == book.bookUrl }
             self.collectionView.reloadData()
             CacheManager.shared.clearCache(bookUrl: book.bookUrl)
@@ -409,6 +400,7 @@ class ShelfViewController: UIViewController {
                                 CacheManager.shared.cacheBookshelf(cached)
                             }
                             Task { try? await NetworkService.shared.saveBook(newBook) }
+                            Task { try? await NetworkService.shared.deleteBook(bookUrl: currentBook.bookUrl) }
                             await MainActor.run { self.books = cached; self.collectionView.reloadData() }
                             tryOpen(currentBook: newBook, hasSwitched: true)
                             return

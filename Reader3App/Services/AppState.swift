@@ -43,4 +43,29 @@ class AppState {
             }
         }
     }
+
+    // MARK: - Deleted Tombstone
+
+    private let deletedBookKey = "deletedBookUrls"
+
+    var deletedBookUrls: [String] {
+        get { UserDefaults.standard.stringArray(forKey: deletedBookKey) ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: deletedBookKey) }
+    }
+
+    func markDeleted(bookUrl: String) {
+        var list = deletedBookUrls
+        if !list.contains(bookUrl) {
+            list.append(bookUrl)
+            deletedBookUrls = list
+        }
+    }
+
+    func clearDeleted(bookUrl: String) {
+        deletedBookUrls = deletedBookUrls.filter { $0 != bookUrl }
+    }
+
+    func isDeleted(bookUrl: String) -> Bool {
+        deletedBookUrls.contains(bookUrl)
+    }
 }

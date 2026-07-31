@@ -61,6 +61,7 @@ class SyncQueue: NSObject {
             guard let dict = try JSONSerialization.jsonObject(with: op.payload) as? [String: Any],
                   let url = dict["bookUrl"] as? String,
                   let index = dict["durChapterIndex"] as? Int else { return }
+            guard !AppState.shared.isDeleted(bookUrl: url) else { return }
             let title = dict["durChapterTitle"] as? String
             let bookName = dict["bookName"] as? String
             let time = dict["durChapterTime"] as? Int64 ?? Int64(Date().timeIntervalSince1970 * 1000)
