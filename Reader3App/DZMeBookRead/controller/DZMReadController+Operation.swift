@@ -199,6 +199,7 @@ extension DZMReadController {
         if recordModel != nil {
             readModel.recordModel = recordModel
             DZM_READ_RECORD_CURRENT_CHAPTER_LOCATION = recordModel.locationFirst
+            saveReadingProgressLocally()
         }
     }
 }

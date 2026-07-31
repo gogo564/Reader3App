@@ -132,6 +132,7 @@ class DZMReadViewScrollController: DZMViewController, UITableViewDelegate, UITab
             self.vc.readModel.recordModel.modify(chapterModel: chapterModel, page: indexPath.row)
             DZM_READ_RECORD_CURRENT_CHAPTER_LOCATION = self.vc.readModel.recordModel.locationFirst
             DispatchQueue.main.async {
+                self.vc.saveReadingProgressLocally()
                 self.topView.chapterName.text = chapterModel?.name
                 self.reloadProgress()
             }
@@ -153,6 +154,7 @@ class DZMReadViewScrollController: DZMViewController, UITableViewDelegate, UITab
         let target = min(max(page, 0), max(pageCount - 1, 0))
         vc.readModel.recordModel.modify(chapterModel: cm, page: target)
         DZM_READ_RECORD_CURRENT_CHAPTER_LOCATION = vc.readModel.recordModel.locationFirst
+        vc.saveReadingProgressLocally()
         if let section = chapterIDs.firstIndex(of: cm.id) {
             tableView.scrollToRow(at: IndexPath(row: target, section: section), at: .top, animated: false)
         }

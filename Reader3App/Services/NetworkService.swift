@@ -154,18 +154,18 @@ final class NetworkService: @unchecked Sendable {
         return nil
     }
 
-    func saveBookProgress(bookUrl: String, index: Int, title: String? = nil, bookName: String? = nil, time: Int64, pos: Int? = nil) async throws {
+    func saveBookProgress(bookUrl: String, index: Int, title: String? = nil, bookName: String? = nil, time: Int64) async throws {
         var book = CacheManager.shared.findCachedBook(bookUrl: bookUrl)
         if book == nil {
             let books = try await getBookshelf()
             book = books.first(where: { $0.bookUrl == bookUrl })
         }
         guard var b = book else {
-            let b = Book(bookUrl: bookUrl, name: bookName ?? "", author: nil, durChapterTitle: title, durChapterIndex: index, durChapterPos: pos, durChapterTime: time)
+            let b = Book(bookUrl: bookUrl, name: bookName ?? "", author: nil, durChapterTitle: title, durChapterIndex: index, durChapterTime: time)
             _ = try await saveBook(b)
             return
         }
-        b = b.withProgress(index: index, title: title, time: time, pos: pos)
+        b = b.withChapterProgress(index: index, title: title, time: time)
         _ = try await saveBook(b)
     }
 

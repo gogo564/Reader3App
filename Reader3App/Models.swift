@@ -124,6 +124,22 @@ struct Book: Codable, Identifiable, Hashable {
              canUpdate: canUpdate, charset: charset,
              lastCheckTime: lastCheckTime, index: index)
     }
+
+    /// 服务器只保留章节: 更新章节信息并清空页码位置
+    func withChapterProgress(index: Int, title: String?, time: Int64) -> Book {
+        Book(bookUrl: bookUrl, name: name, author: author, kind: kind,
+             coverUrl: coverUrl, customCoverUrl: customCoverUrl,
+             origin: origin, originName: originName, intro: intro,
+             totalChapterNum: totalChapterNum, order: order,
+             durChapterTitle: title ?? durChapterTitle,
+             durChapterIndex: index,
+             durChapterPos: nil,
+             durChapterTime: time,
+             latestChapterTitle: latestChapterTitle, wordCount: wordCount,
+             type: type, group: group, tocUrl: tocUrl,
+             canUpdate: canUpdate, charset: charset,
+             lastCheckTime: lastCheckTime, index: index)
+    }
 }
 
 struct BookGroup: Codable, Identifiable {

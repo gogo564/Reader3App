@@ -39,9 +39,17 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     private var ttsPlaying: Bool = false
     private var ttsHasStarted: Bool = false
     private var ttsStopped: Bool = false
-    private var ttsCurrentUtterance: AVSpeechUtterance?
-    private var ttsBaseOffset: Int = 0
     private var ttsPausePage: Int = -1
+    private var ttsQueueID: Int = 0
+    private var ttsSegments: [TTSSegment] = []
+    private var ttsSegmentIndex: Int = 0
+    private var ttsUtteranceSegment: [ObjectIdentifier: Int] = [:]
+    private var lastSavedProgressKey: String = ""
+
+    private struct TTSSegment {
+        let range: NSRange
+        let page: Int
+    }
 
     override func viewDidLoad() {
         
@@ -99,8 +107,9 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         saveReadingProgress()
 
         ttsStopped = true
-        ttsCurrentUtterance = nil
         ttsPausePage = -1
+        ttsQueueID += 1
+        ttsUtteranceSegment.removeAll()
         if ttsSynthesizer.isPaused {
             ttsSynthesizer.continueSpeaking()
         }
@@ -109,29 +118,39 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         ttsHasStarted = false
     }
     
-    private func saveReadingProgress() {
+    /// 进度保存: 本地为准
+    func saveReadingProgressLocally() {
+        guard let rm = readModel?.recordModel, let chapterID = rm.chapterModel?.id else { return }
+        let bookUrl = readModel.bookID ?? ""
+        let index = chapterID.intValue
+        let pos = rm.locationFirst?.intValue ?? 0
+        let key = "\(index):\(pos)"
+        guard key != lastSavedProgressKey else { return }
+        lastSavedProgressKey = key
+        CacheManager.shared.updateBookProgress(bookUrl: bookUrl, bookName: readModel.bookName ?? "", index: index, chapterTitle: rm.chapterName ?? "", time: Int64(Date().timeIntervalSince1970 * 1000), pos: pos)
+    }
+
+    /// 进度保存: 本地为准 + 服务器只保留章节
+    func saveReadingProgress() {
+        saveReadingProgressLocally()
         guard let rm = readModel?.recordModel, let chapterID = rm.chapterModel?.id else { return }
         let bookUrl = readModel.bookID ?? ""
         let index = chapterID.intValue
         let title = rm.chapterName ?? ""
         let bookName = readModel.bookName ?? ""
         let time = Int64(Date().timeIntervalSince1970 * 1000)
-        let pos = rm.locationFirst?.intValue ?? 0
-
-        CacheManager.shared.updateBookProgress(bookUrl: bookUrl, bookName: bookName, index: index, chapterTitle: title, time: time, pos: pos)
 
         if NetworkMonitor.shared.isConnected {
             Task {
                 if let cached = CacheManager.shared.findCachedBook(bookUrl: bookUrl) {
-                    var book = cached.withProgress(index: index, title: title, time: time, pos: pos)
-                    _ = try? await NetworkService.shared.saveBook(book)
+                    _ = try? await NetworkService.shared.saveBook(cached.withChapterProgress(index: index, title: title, time: time))
                 } else {
-                    let book = Book(bookUrl: bookUrl, name: bookName, author: nil, durChapterTitle: title, durChapterIndex: index, durChapterPos: pos, durChapterTime: time)
+                    let book = Book(bookUrl: bookUrl, name: bookName, author: nil, durChapterTitle: title, durChapterIndex: index, durChapterTime: time)
                     _ = try? await NetworkService.shared.saveBook(book)
                 }
             }
         } else {
-            let payload = (try? JSONSerialization.data(withJSONObject: ["bookUrl": bookUrl, "bookName": bookName, "durChapterIndex": index, "durChapterTitle": title, "durChapterTime": time, "durChapterPos": pos])) ?? Data()
+            let payload = (try? JSONSerialization.data(withJSONObject: ["bookUrl": bookUrl, "bookName": bookName, "durChapterIndex": index, "durChapterTitle": title, "durChapterTime": time])) ?? Data()
             SyncQueue.shared.enqueue(type: .saveProgress, bookUrl: bookUrl, payload: payload)
         }
     }
@@ -607,12 +626,11 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     func ttsView(_ ttsView: DZMRMTTSView, didChangeSpeed speed: Float) {
         ttsSpeed = speed
-        if ttsPlaying || ttsHasStarted {
-            let wasPlaying = ttsPlaying
+        guard ttsPlaying || ttsHasStarted else { return }
+        if ttsPlaying {
             restartTTS()
-            if !wasPlaying {
-                pauseTTS()
-            }
+        } else {
+            stopTTS()
         }
     }
 
@@ -620,18 +638,17 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         ttsVoice = voice
         UserDefaults.standard.set(voice.name, forKey: TTS_VOICE_NAME_KEY)
         UserDefaults.standard.set(voice.language, forKey: TTS_VOICE_LANG_KEY)
-        if ttsPlaying || ttsHasStarted {
-            let wasPlaying = ttsPlaying
+        guard ttsPlaying || ttsHasStarted else { return }
+        if ttsPlaying {
             restartTTS()
-            if !wasPlaying {
-                pauseTTS()
-            }
+        } else {
+            stopTTS()
         }
     }
 
     // MARK: -- TTS 控制
 
-    private func startTTS() {
+    private func startTTS(base: Int? = nil) {
         guard let chapter = readModel.recordModel.chapterModel,
               let full = chapter.fullContent,
               !full.string.isEmpty else { return }
@@ -640,22 +657,32 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
         let titleLen = chapter.fullName.utf16.count
         let location = readModel.recordModel.locationFirst?.intValue ?? 0
-        let base = min(max(location, titleLen), full.string.utf16.count)
-        let nsFull = full.string as NSString
-        let text = nsFull.substring(from: base)
-        guard !text.isEmpty else { return }
-
-        ttsBaseOffset = base
+        let b = base ?? min(max(location, titleLen), full.string.utf16.count)
+        guard b < full.string.utf16.count else { return }
         ttsPausePage = readModel.recordModel.page.intValue
 
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = ttsVoice ?? AVSpeechSynthesisVoice(language: "zh-CN")
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * ttsSpeed
-        utterance.volume = 1.0
+        let segments = buildTTSSegments(chapter: chapter, from: b)
+        guard !segments.isEmpty else { return }
 
-        ttsCurrentUtterance = utterance
+        ttsQueueID += 1
+        ttsUtteranceSegment.removeAll()
+        ttsSegments = segments
+        ttsSegmentIndex = 0
         ttsStopped = false
-        ttsSynthesizer.speak(utterance)
+        currentDisplayController?.setTTSSpokenRange(nil)
+
+        let nsFull = full.string as NSString
+        for (i, seg) in segments.enumerated() {
+            let text = nsFull.substring(with: seg.range)
+            guard !text.isEmpty else { continue }
+            let utterance = AVSpeechUtterance(string: text)
+            utterance.voice = ttsVoice ?? AVSpeechSynthesisVoice(language: "zh-CN")
+            utterance.rate = AVSpeechUtteranceDefaultSpeechRate * ttsSpeed
+            utterance.volume = 1.0
+            ttsUtteranceSegment[ObjectIdentifier(utterance)] = i
+            ttsSynthesizer.speak(utterance)
+        }
+
         ttsPlaying = true
         ttsHasStarted = true
 
@@ -664,6 +691,46 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [])
         try? AVAudioSession.sharedInstance().setActive(true)
+    }
+
+    /// 按"句子/段落 + 页码"拆分朗读段, 一段不跨页, 整段高亮
+    private func buildTTSSegments(chapter: DZMReadChapterModel, from base: Int) -> [TTSSegment] {
+        guard let full = chapter.fullContent, !full.string.isEmpty,
+              let pageModels = chapter.pageModels, !pageModels.isEmpty else { return [] }
+        let ns = full.string as NSString
+        let total = ns.length
+        let maxLen = 45
+        let minBreak = 4
+        let enderChars: Set<UniChar> = [0x3002, 0xFF01, 0xFF1F, 0x2026, 0xFF1B, 0x3B, 0x21, 0x3F, 0x0A]
+
+        var result: [TTSSegment] = []
+        for (pageIdx, pm) in pageModels.enumerated() {
+            let pageStart = max(pm.range.location, base)
+            let pageEnd = min(pm.range.location + pm.range.length, total)
+            if pageStart >= pageEnd { continue }
+            var s = pageStart
+            while s < pageEnd {
+                let segEndLimit = min(s + maxLen, pageEnd)
+                var lastEnder = -1
+                var j = s
+                while j < segEndLimit {
+                    if enderChars.contains(ns.character(at: j)) { lastEnder = j + 1 }
+                    j += 1
+                }
+                let e: Int
+                if lastEnder > 0 && lastEnder - s >= minBreak {
+                    e = lastEnder
+                } else {
+                    e = segEndLimit
+                }
+                let len = e - s
+                if len > 0 {
+                    result.append(TTSSegment(range: NSRange(location: s, length: len), page: pageIdx))
+                }
+                s = e
+            }
+        }
+        return result
     }
 
     private func pauseTTS() {
@@ -681,8 +748,9 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     private func stopTTS() {
         ttsStopped = true
-        ttsCurrentUtterance = nil
         ttsPausePage = -1
+        ttsQueueID += 1
+        ttsUtteranceSegment.removeAll()
         if ttsSynthesizer.isPaused {
             ttsSynthesizer.continueSpeaking()
         }
@@ -694,24 +762,44 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     }
 
     private func restartTTS() {
-        ttsStopped = true
-        ttsCurrentUtterance = nil
-        ttsPausePage = -1
-        if ttsSynthesizer.isPaused {
-            ttsSynthesizer.continueSpeaking()
+        guard !ttsSegments.isEmpty else {
+            startTTS()
+            return
         }
-        ttsSynthesizer.stopSpeaking(at: .immediate)
-        ttsPlaying = false
-        ttsHasStarted = false
-        currentDisplayController?.setTTSSpokenRange(nil)
-        startTTS()
+        let idx = min(max(ttsSegmentIndex, 0), ttsSegments.count - 1)
+        startTTS(base: ttsSegments[idx].range.location)
     }
 
     // MARK: -- AVSpeechSynthesizerDelegate
 
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        guard utterance === ttsCurrentUtterance else { return }
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
         guard !ttsStopped else { return }
+        guard let segIdx = ttsUtteranceSegment[ObjectIdentifier(utterance)], segIdx < ttsSegments.count else { return }
+        ttsSegmentIndex = segIdx
+        let seg = ttsSegments[segIdx]
+        ttsTurnPage(to: seg.page)
+
+        guard let pageModel = currentDisplayController?.recordModel.pageModel else { return }
+        let local = seg.range.location - pageModel.range.location
+        if local >= 0 {
+            let length = min(seg.range.length, max(0, pageModel.content.length - local))
+            if length > 0 {
+                currentDisplayController?.setTTSSpokenRange(NSRange(location: local, length: length))
+            } else {
+                currentDisplayController?.setTTSSpokenRange(nil)
+            }
+        } else {
+            currentDisplayController?.setTTSSpokenRange(nil)
+        }
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        guard !ttsStopped else { return }
+        guard let segIdx = ttsUtteranceSegment[ObjectIdentifier(utterance)] else { return }
+        if segIdx == ttsSegmentIndex {
+            currentDisplayController?.setTTSSpokenRange(nil)
+        }
+        guard segIdx == ttsSegments.count - 1 else { return }
         guard !readModel.recordModel.isLastChapter else {
             ttsPlaying = false
             currentDisplayController?.setTTSSpokenRange(nil)
@@ -720,36 +808,8 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         }
         let nextID = readModel.recordModel.chapterModel.nextChapterID!
         navigateToChapter(chapterID: nextID) { [weak self] in
-            self?.startTTS()
-        }
-    }
-
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        if utterance === ttsCurrentUtterance {
-            ttsStopped = true
-        }
-    }
-
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, willSpeakRangeOfSpeechString characterRange: NSRange, utterance: AVSpeechUtterance) {
-        guard !ttsStopped, utterance === ttsCurrentUtterance,
-              let cm = readModel.recordModel.chapterModel else { return }
-
-        let absOffset = ttsBaseOffset + characterRange.location
-
-        let targetPage = cm.page(location: absOffset).intValue
-        ttsTurnPage(to: targetPage)
-
-        guard let pageModel = currentDisplayController?.recordModel.pageModel else { return }
-        let local = absOffset - pageModel.range.location
-        guard local >= 0 else {
-            currentDisplayController?.setTTSSpokenRange(nil)
-            return
-        }
-        let len = min(characterRange.length, max(0, pageModel.content.length - local))
-        if len > 0 {
-            currentDisplayController?.setTTSSpokenRange(NSRange(location: local, length: len))
-        } else {
-            currentDisplayController?.setTTSSpokenRange(nil)
+            guard let self = self, !self.ttsStopped else { return }
+            self.startTTS()
         }
     }
 
@@ -843,8 +903,9 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     deinit {
         
         ttsStopped = true
-        ttsCurrentUtterance = nil
         ttsPausePage = -1
+        ttsQueueID += 1
+        ttsUtteranceSegment.removeAll()
         if ttsSynthesizer.isPaused {
             ttsSynthesizer.continueSpeaking()
         }
