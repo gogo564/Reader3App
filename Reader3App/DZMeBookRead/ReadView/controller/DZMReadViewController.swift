@@ -105,6 +105,19 @@ class DZMReadViewController: DZMViewController {
             bottomView.progress.text = "\(recordModel.page.intValue + 1)/\(recordModel.chapterModel!.pageCount.intValue)"
         }
     }
+
+    /// 设置朗读高亮(传入本页内范围,nil 清除高亮)
+    func setTTSSpokenRange(_ range: NSRange?) {
+        guard let readView = readView, let pageModel = recordModel.pageModel else { return }
+        let base = pageModel.showContent
+        if let range = range, range.location >= 0, NSMaxRange(range) <= base.length {
+            let mutable = NSMutableAttributedString(attributedString: base)
+            mutable.addAttribute(.foregroundColor, value: DZMReadConfigure.shared().ttsHighlightColor, range: range)
+            readView.content = mutable
+        } else {
+            readView.content = base
+        }
+    }
     
     deinit {
         

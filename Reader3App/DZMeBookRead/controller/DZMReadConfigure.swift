@@ -125,6 +125,12 @@ class DZMReadConfigure: NSObject {
         // 字体颜色列表选择
 //         return DZM_READ_STATUS_TEXT_COLORS[statusTextColorIndex.intValue]
     }
+
+    /// 朗读高亮颜色(根据背景自动适配)
+    var ttsHighlightColor:UIColor {
+        if bgColorIndex.intValue == 4 { return RGB(255, 170, 66) }
+        return DZM_READ_COLOR_MAIN
+    }
     
     /// 行间距(请设置整数,因为需要比较是否需要重新分页,小数点没法判断相等)
     var lineSpacing:CGFloat! {

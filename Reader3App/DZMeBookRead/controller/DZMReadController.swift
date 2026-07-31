@@ -39,6 +39,8 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     private var ttsPlaying: Bool = false
     private var ttsHasStarted: Bool = false
     private var ttsStopped: Bool = false
+    private var ttsCurrentUtterance: AVSpeechUtterance?
+    private var ttsBaseOffset: Int = 0
 
     override func viewDidLoad() {
         
@@ -96,6 +98,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         saveReadingProgress()
 
         ttsStopped = true
+        ttsCurrentUtterance = nil
         if ttsSynthesizer.isPaused {
             ttsSynthesizer.continueSpeaking()
         }
@@ -627,33 +630,34 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     // MARK: -- TTS 控制
 
     private func startTTS() {
-        guard let chapter = readModel.recordModel.chapterModel else { return }
-        let fullText = chapter.content ?? ""
-        guard !fullText.isEmpty else { return }
+        guard let chapter = readModel.recordModel.chapterModel,
+              let full = chapter.fullContent,
+              !full.string.isEmpty else { return }
 
         ttsSynthesizer.stopSpeaking(at: .immediate)
 
+        let titleLen = chapter.fullName.utf16.count
         let location = readModel.recordModel.locationFirst?.intValue ?? 0
-        let text: String
-        if location > 0 && location < fullText.utf16.count {
-            let nsText = fullText as NSString
-            text = nsText.substring(from: location)
-        } else {
-            text = fullText
-        }
+        let base = min(max(location, titleLen), full.string.utf16.count)
+        let nsFull = full.string as NSString
+        let text = nsFull.substring(from: base)
+        guard !text.isEmpty else { return }
+
+        ttsBaseOffset = base
 
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = ttsVoice ?? AVSpeechSynthesisVoice(language: "zh-CN")
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate * ttsSpeed
         utterance.volume = 1.0
 
+        ttsCurrentUtterance = utterance
         ttsStopped = false
         ttsSynthesizer.speak(utterance)
         ttsPlaying = true
         ttsHasStarted = true
 
-        readMenu.ttsView.isPlaying = true
-        readMenu.ttsView.chapterName = chapter.name ?? ""
+        readMenu?.ttsView?.isPlaying = true
+        readMenu?.ttsView?.chapterName = chapter.name ?? ""
 
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [])
         try? AVAudioSession.sharedInstance().setActive(true)
@@ -673,32 +677,38 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     private func stopTTS() {
         ttsStopped = true
+        ttsCurrentUtterance = nil
         if ttsSynthesizer.isPaused {
             ttsSynthesizer.continueSpeaking()
         }
         ttsSynthesizer.stopSpeaking(at: .immediate)
         ttsPlaying = false
         ttsHasStarted = false
+        currentDisplayController?.setTTSSpokenRange(nil)
         readMenu?.ttsView?.isPlaying = false
     }
 
     private func restartTTS() {
         ttsStopped = true
+        ttsCurrentUtterance = nil
         if ttsSynthesizer.isPaused {
             ttsSynthesizer.continueSpeaking()
         }
         ttsSynthesizer.stopSpeaking(at: .immediate)
         ttsPlaying = false
         ttsHasStarted = false
+        currentDisplayController?.setTTSSpokenRange(nil)
         startTTS()
     }
 
     // MARK: -- AVSpeechSynthesizerDelegate
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        guard utterance === ttsCurrentUtterance else { return }
         guard !ttsStopped else { return }
         guard !readModel.recordModel.isLastChapter else {
             ttsPlaying = false
+            currentDisplayController?.setTTSSpokenRange(nil)
             readMenu?.ttsView?.isPlaying = false
             return
         }
@@ -709,7 +719,51 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        ttsStopped = true
+        if utterance === ttsCurrentUtterance {
+            ttsStopped = true
+        }
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, willSpeakRangeOfSpeechString characterRange: NSRange, utterance: AVSpeechUtterance) {
+        guard !ttsStopped, utterance === ttsCurrentUtterance,
+              let cm = readModel.recordModel.chapterModel else { return }
+
+        let absOffset = ttsBaseOffset + characterRange.location
+
+        let targetPage = cm.page(location: absOffset).intValue
+        ttsTurnPage(to: targetPage)
+
+        guard let pageModel = currentDisplayController?.recordModel.pageModel else { return }
+        let local = absOffset - pageModel.range.location
+        guard local >= 0 else {
+            currentDisplayController?.setTTSSpokenRange(nil)
+            return
+        }
+        let len = min(characterRange.length, max(0, pageModel.content.length - local))
+        if len > 0 {
+            currentDisplayController?.setTTSSpokenRange(NSRange(location: local, length: len))
+        } else {
+            currentDisplayController?.setTTSSpokenRange(nil)
+        }
+    }
+
+    private func ttsTurnPage(to page: Int) {
+        guard let cm = readModel.recordModel.chapterModel else { return }
+        let target = min(max(page, 0), max(cm.pageCount.intValue - 1, 0))
+        let current = readModel.recordModel.page.intValue
+        guard target != current else { return }
+
+        if DZMReadConfigure.shared().effectType == .scroll {
+            scrollController?.scrollToTTSLocation(page: target)
+            return
+        }
+
+        let newRecord = readModel.recordModel.copyModel()
+        newRecord.page = NSNumber(value: target)
+        updateReadRecord(recordModel: newRecord)
+        guard let vc = GetReadViewController(recordModel: newRecord) else { return }
+        currentDisplayController = vc
+        setViewController(displayController: vc, isAbove: target < current, animated: false)
     }
 
     private func navigateToChapter(chapterID: NSNumber, completion: @escaping () -> Void) {
@@ -783,6 +837,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     deinit {
         
         ttsStopped = true
+        ttsCurrentUtterance = nil
         if ttsSynthesizer.isPaused {
             ttsSynthesizer.continueSpeaking()
         }

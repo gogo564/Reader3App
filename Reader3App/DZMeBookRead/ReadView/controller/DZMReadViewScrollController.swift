@@ -147,6 +147,19 @@ class DZMReadViewScrollController: DZMViewController, UITableViewDelegate, UITab
         }
     }
 
+    func scrollToTTSLocation(page: Int) {
+        guard let cm = vc.readModel.recordModel.chapterModel else { return }
+        let pageCount = cm.pageCount.intValue
+        let target = min(max(page, 0), max(pageCount - 1, 0))
+        vc.readModel.recordModel.modify(chapterModel: cm, page: target)
+        DZM_READ_RECORD_CURRENT_CHAPTER_LOCATION = vc.readModel.recordModel.locationFirst
+        if let section = chapterIDs.firstIndex(of: cm.id) {
+            tableView.scrollToRow(at: IndexPath(row: target, section: section), at: .top, animated: false)
+        }
+        topView?.chapterName.text = cm.name
+        reloadProgress()
+    }
+
     private func GetChapterModel(chapterID: NSNumber) -> DZMReadChapterModel? {
         if let m = chapterModels[chapterID.stringValue] { return m }
         return nil
