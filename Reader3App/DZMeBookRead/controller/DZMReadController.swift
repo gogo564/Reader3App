@@ -118,21 +118,23 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         ttsHasStarted = false
     }
     
-    /// 进度保存: 本地为准
-    func saveReadingProgressLocally() {
-        guard let rm = readModel?.recordModel, let chapterID = rm.chapterModel?.id else { return }
+    /// 进度保存: 本地为准。位置未变化返回 false（不再触发服务器上传）
+    @discardableResult
+    func saveReadingProgressLocally() -> Bool {
+        guard let rm = readModel?.recordModel, let chapterID = rm.chapterModel?.id else { return false }
         let bookUrl = readModel.bookID ?? ""
         let index = chapterID.intValue
         let pos = rm.locationFirst?.intValue ?? 0
         let key = "\(index):\(pos)"
-        guard key != lastSavedProgressKey else { return }
+        guard key != lastSavedProgressKey else { return false }
         lastSavedProgressKey = key
         CacheManager.shared.updateBookProgress(bookUrl: bookUrl, bookName: readModel.bookName ?? "", index: index, chapterTitle: rm.chapterName ?? "", time: Int64(Date().timeIntervalSince1970 * 1000), pos: pos)
+        return true
     }
 
-    /// 进度保存: 本地为准 + 服务器只保留章节
+    /// 进度保存: 本地为准 + 服务器只保留章节。仅当阅读位置发生变化时才上传，减少请求数
     func saveReadingProgress() {
-        saveReadingProgressLocally()
+        guard saveReadingProgressLocally() else { return }
         guard let rm = readModel?.recordModel, let chapterID = rm.chapterModel?.id else { return }
         let bookUrl = readModel.bookID ?? ""
         let index = chapterID.intValue
