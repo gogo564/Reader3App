@@ -356,7 +356,7 @@ class ShelfViewController: UIViewController {
         }
 
         readController.readModel = readModel
-        navigationController?.pushViewController(readController, animated: true)
+        navigationController?.pushViewController(readController, animated: false)
     }
 
     private func chapterListCache(bookUrl: String) -> [Chapter]? {

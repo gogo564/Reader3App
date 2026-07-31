@@ -68,6 +68,9 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         // 隐藏导航栏, 保持阅读页面样式 (菜单加载完成后也会设置, 此处提前生效避免加载期露导航栏)
         fd_prefersNavigationBarHidden = true
 
+        // 阅读页隐藏状态栏 (菜单创建后也会设置, 此处提前生效避免加载期显示时间)
+        UIApplication.shared.setStatusBarHidden(true, with: .none)
+
         if let savedName = UserDefaults.standard.string(forKey: TTS_VOICE_NAME_KEY),
            let savedLang = UserDefaults.standard.string(forKey: TTS_VOICE_LANG_KEY) {
             ttsVoice = AVSpeechSynthesisVoice.speechVoices().first(where: { $0.name == savedName && $0.language == savedLang })
