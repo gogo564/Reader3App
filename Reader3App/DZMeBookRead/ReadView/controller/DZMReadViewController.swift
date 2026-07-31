@@ -108,15 +108,20 @@ class DZMReadViewController: DZMViewController {
 
     /// 设置朗读高亮(传入本页内范围,nil 清除高亮)
     func setTTSSpokenRange(_ range: NSRange?) {
-        guard let readView = readView, let pageModel = recordModel.pageModel,
+        guard let pageModel = recordModel.pageModel,
               let base = pageModel.showContent else { return }
         if let range = range, range.location >= 0, NSMaxRange(range) <= base.length {
             let mutable = NSMutableAttributedString(attributedString: base)
             mutable.addAttribute(.foregroundColor, value: DZMReadConfigure.shared().ttsHighlightColor, range: range)
-            readView.content = mutable
+            applyTTSSpokenContent(mutable)
         } else {
-            readView.content = base
+            applyTTSSpokenContent(base)
         }
+    }
+
+    /// 应用朗读高亮内容(子类可覆写)
+    func applyTTSSpokenContent(_ attr: NSAttributedString) {
+        readView.content = attr
     }
     
     deinit {

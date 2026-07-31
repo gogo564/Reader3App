@@ -41,6 +41,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     private var ttsStopped: Bool = false
     private var ttsCurrentUtterance: AVSpeechUtterance?
     private var ttsBaseOffset: Int = 0
+    private var ttsPausePage: Int = -1
 
     override func viewDidLoad() {
         
@@ -99,6 +100,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
         ttsStopped = true
         ttsCurrentUtterance = nil
+        ttsPausePage = -1
         if ttsSynthesizer.isPaused {
             ttsSynthesizer.continueSpeaking()
         }
@@ -580,7 +582,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     func ttsViewDidTapPlayPause(_ ttsView: DZMRMTTSView) {
         if ttsPlaying {
             pauseTTS()
-        } else if ttsHasStarted {
+        } else if ttsHasStarted && readModel.recordModel.page.intValue == ttsPausePage {
             resumeTTS()
         } else {
             startTTS()
@@ -644,6 +646,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         guard !text.isEmpty else { return }
 
         ttsBaseOffset = base
+        ttsPausePage = readModel.recordModel.page.intValue
 
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = ttsVoice ?? AVSpeechSynthesisVoice(language: "zh-CN")
@@ -664,6 +667,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     }
 
     private func pauseTTS() {
+        ttsPausePage = readModel.recordModel.page.intValue
         ttsSynthesizer.pauseSpeaking(at: .word)
         ttsPlaying = false
         readMenu.ttsView.isPlaying = false
@@ -678,6 +682,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     private func stopTTS() {
         ttsStopped = true
         ttsCurrentUtterance = nil
+        ttsPausePage = -1
         if ttsSynthesizer.isPaused {
             ttsSynthesizer.continueSpeaking()
         }
@@ -691,6 +696,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     private func restartTTS() {
         ttsStopped = true
         ttsCurrentUtterance = nil
+        ttsPausePage = -1
         if ttsSynthesizer.isPaused {
             ttsSynthesizer.continueSpeaking()
         }
@@ -838,6 +844,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         
         ttsStopped = true
         ttsCurrentUtterance = nil
+        ttsPausePage = -1
         if ttsSynthesizer.isPaused {
             ttsSynthesizer.continueSpeaking()
         }

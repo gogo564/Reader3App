@@ -39,6 +39,14 @@ class DZMReadLongPressViewController: DZMReadViewController {
     
     // MARK: 页面触摸拖拽处理
     
+    /// 应用朗读高亮内容(长按视图需用完整内容高度重建 frameRef)
+    override func applyTTSSpokenContent(_ attr: NSAttributedString) {
+        guard let readView = readView, let pageModel = recordModel.pageModel else { return }
+        let size = pageModel.contentSize
+        readView.frameRef = GetFrameRef(attrString: attr, rect: CGRect(x: 0, y: 0, width: size.width, height: size.height))
+        readView.setNeedsDisplay()
+    }
+    
     /// 触摸开始
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         
