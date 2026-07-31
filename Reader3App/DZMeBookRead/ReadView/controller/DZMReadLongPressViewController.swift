@@ -42,8 +42,7 @@ class DZMReadLongPressViewController: DZMReadViewController {
     /// 应用朗读高亮内容(长按视图需用完整内容高度重建 frameRef)
     override func applyTTSSpokenContent(_ attr: NSAttributedString) {
         guard let readView = readView, let pageModel = recordModel.pageModel else { return }
-        let size = pageModel.contentSize
-        readView.frameRef = DZMCoreText.GetFrameRef(attrString: attr, rect: CGRect(x: 0, y: 0, width: size.width, height: size.height))
+        readView.frameRef = DZMCoreText.GetFrameRef(attrString: attr, rect: CGRect(x: 0, y: 0, width: pageModel.contentSize.width, height: pageModel.contentSize.height))
         readView.setNeedsDisplay()
     }
     
