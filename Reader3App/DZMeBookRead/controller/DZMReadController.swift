@@ -684,6 +684,9 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     private func restartTTS() {
         ttsStopped = true
+        if ttsSynthesizer.isPaused {
+            ttsSynthesizer.continueSpeaking()
+        }
         ttsSynthesizer.stopSpeaking(at: .immediate)
         ttsPlaying = false
         ttsHasStarted = false
