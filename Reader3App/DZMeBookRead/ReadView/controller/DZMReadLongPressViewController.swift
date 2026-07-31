@@ -43,7 +43,7 @@ class DZMReadLongPressViewController: DZMReadViewController {
     override func applyTTSSpokenContent(_ attr: NSAttributedString) {
         guard let readView = readView, let pageModel = recordModel.pageModel else { return }
         let size = pageModel.contentSize
-        readView.frameRef = GetFrameRef(attrString: attr, rect: CGRect(x: 0, y: 0, width: size.width, height: size.height))
+        readView.frameRef = DZMCoreText.GetFrameRef(attrString: attr, rect: CGRect(x: 0, y: 0, width: size.width, height: size.height))
         readView.setNeedsDisplay()
     }
     
