@@ -693,15 +693,17 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         try? AVAudioSession.sharedInstance().setActive(true)
     }
 
-    /// 按"句子/段落 + 页码"拆分朗读段, 一段不跨页, 整段高亮
+    /// 按"句子/段落 + 页码"拆分朗读段, 一段不跨页, 整段高亮;
+    /// 优先断在句末标点: 窗口内没有就扩大范围继续找, 实在没有才退而断在最后一个逗号, 避免硬切在词语中间
     private func buildTTSSegments(chapter: DZMReadChapterModel, from base: Int) -> [TTSSegment] {
         guard let full = chapter.fullContent, !full.string.isEmpty,
               let pageModels = chapter.pageModels, !pageModels.isEmpty else { return [] }
         let ns = full.string as NSString
         let total = ns.length
         let maxLen = 45
-        let minBreak = 4
+        let hardCap = 120
         let enderChars: Set<UniChar> = [0x3002, 0xFF01, 0xFF1F, 0x2026, 0xFF1B, 0x3B, 0x21, 0x3F, 0x0A]
+        let softChars: Set<UniChar> = [0xFF0C, 0x2C]
 
         var result: [TTSSegment] = []
         for (pageIdx, pm) in pageModels.enumerated() {
@@ -710,18 +712,38 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
             if pageStart >= pageEnd { continue }
             var s = pageStart
             while s < pageEnd {
-                let segEndLimit = min(s + maxLen, pageEnd)
+                let softLimit = min(s + maxLen, pageEnd)
                 var lastEnder = -1
+                var lastSoft = -1
                 var j = s
-                while j < segEndLimit {
-                    if enderChars.contains(ns.character(at: j)) { lastEnder = j + 1 }
+                while j < softLimit {
+                    let ch = ns.character(at: j)
+                    if enderChars.contains(ch) { lastEnder = j + 1 }
+                    if softChars.contains(ch) { lastSoft = j + 1 }
                     j += 1
                 }
-                let e: Int
-                if lastEnder > 0 && lastEnder - s >= minBreak {
+                var e: Int
+                if lastEnder > 0 {
                     e = lastEnder
+                } else if softLimit < pageEnd {
+                    let hardLimit = min(s + hardCap, pageEnd)
+                    var farEnder = -1
+                    var k = softLimit
+                    while k < hardLimit {
+                        if enderChars.contains(ns.character(at: k)) { farEnder = k + 1 }
+                        k += 1
+                    }
+                    if farEnder > 0 {
+                        e = farEnder
+                    } else if lastSoft > 0 {
+                        e = lastSoft
+                    } else {
+                        e = hardLimit
+                    }
+                } else if lastSoft > 0 {
+                    e = lastSoft
                 } else {
-                    e = segEndLimit
+                    e = pageEnd
                 }
                 let len = e - s
                 if len > 0 {
