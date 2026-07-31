@@ -147,18 +147,26 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                     rm.modify(chapterID: cm.id, location: bookInitialPos)
                 }
                 await MainActor.run {
-                    guard self.isStillVisible() else { return }
-                    self.isLoadingBook = false
-                    self.hideLoadingView()
-                    self.readModel.recordModel = rm
-                    self.updateReadRecord(recordModel: rm)
-                    self.readMenu = DZMReadMenu(vc: self, delegate: self)
-                    self.creatPageController(displayController: self.GetCurrentReadViewController(isUpdateFont: true))
-                    self.prefetchNextChapters(bookUrl: bookUrl, from: index + 1)
+                    self.completeLoad(recordModel: rm, bookUrl: bookUrl, prefetchFrom: index + 1)
                 }
             } catch {
                 await self.handleLoadFailure(bookUrl: bookUrl, hasSwitched: hasSwitched)
             }
+        }
+    }
+
+    /// 加载完成(主线程): 组装阅读界面, 并重新绑定目录以定位当前章节
+    private func completeLoad(recordModel: DZMReadRecordModel, bookUrl: String, prefetchFrom: Int?) {
+        guard isStillVisible() else { return }
+        isLoadingBook = false
+        hideLoadingView()
+        readModel.recordModel = recordModel
+        updateReadRecord(recordModel: recordModel)
+        leftView.catalogView.readModel = readModel
+        readMenu = DZMReadMenu(vc: self, delegate: self)
+        creatPageController(displayController: GetCurrentReadViewController(isUpdateFont: true))
+        if let from = prefetchFrom {
+            prefetchNextChapters(bookUrl: bookUrl, from: from)
         }
     }
 
@@ -199,13 +207,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                 rm.modify(chapterID: cm.id, location: bookInitialPos)
             }
             await MainActor.run {
-                guard self.isStillVisible() else { return }
-                self.isLoadingBook = false
-                self.hideLoadingView()
-                self.readModel.recordModel = rm
-                self.updateReadRecord(recordModel: rm)
-                self.readMenu = DZMReadMenu(vc: self, delegate: self)
-                self.creatPageController(displayController: self.GetCurrentReadViewController(isUpdateFont: true))
+                self.completeLoad(recordModel: rm, bookUrl: bookUrl, prefetchFrom: nil)
             }
             return
         }
@@ -222,13 +224,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                 rm.modify(chapterID: cm.id, location: bookInitialPos)
             }
             await MainActor.run {
-                guard self.isStillVisible() else { return }
-                self.isLoadingBook = false
-                self.hideLoadingView()
-                self.readModel.recordModel = rm
-                self.updateReadRecord(recordModel: rm)
-                self.readMenu = DZMReadMenu(vc: self, delegate: self)
-                self.creatPageController(displayController: self.GetCurrentReadViewController(isUpdateFont: true))
+                self.completeLoad(recordModel: rm, bookUrl: bookUrl, prefetchFrom: nil)
             }
             return
         }

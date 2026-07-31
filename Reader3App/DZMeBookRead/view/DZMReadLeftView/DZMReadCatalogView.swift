@@ -50,16 +50,20 @@ class DZMReadCatalogView: UIView,UITableViewDelegate,UITableViewDataSource {
     /// 滚动到阅读记录
     func scrollRecord() {
         
-        if readModel != nil {
+        guard let rm = readModel.recordModel else {
             
             tableView.reloadData()
-       
-            let chapterListModel = (readModel.chapterListModels as NSArray).filtered(using: NSPredicate(format: "id == %@", readModel.recordModel.chapterModel.id)).first as? DZMReadChapterListModel
+            
+            return
+        }
+            
+        tableView.reloadData()
+        
+        let chapterListModel = (readModel.chapterListModels as NSArray).filtered(using: NSPredicate(format: "id == %@", rm.chapterModel.id)).first as? DZMReadChapterListModel
 
-            if chapterListModel != nil {
+        if chapterListModel != nil {
 
-                tableView.scrollToRow(at: IndexPath(row: readModel.chapterListModels.index(of: chapterListModel!)!, section: 0), at: .middle, animated: false)
-            }
+            tableView.scrollToRow(at: IndexPath(row: readModel.chapterListModels.index(of: chapterListModel!)!, section: 0), at: .middle, animated: false)
         }
     }
     
@@ -96,7 +100,7 @@ class DZMReadCatalogView: UIView,UITableViewDelegate,UITableViewDataSource {
         }else{ cell.spaceLine.backgroundColor = DZM_COLOR_230_230_230 }
         
         // 阅读记录
-        if readModel.recordModel.chapterModel.id == chapterListModel.id {
+        if let rm = readModel.recordModel, rm.chapterModel.id == chapterListModel.id {
             
             cell.chapterName.textColor = DZM_READ_COLOR_MAIN
             
