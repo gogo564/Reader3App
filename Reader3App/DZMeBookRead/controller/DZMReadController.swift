@@ -25,14 +25,6 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
     var tempNumber: NSInteger = 1
     var catalogChapters: [Chapter] = []
     var bookAuthor: String?
-    var book: Book?
-    var bookInitialIndex = 0
-    var bookInitialTitle: String?
-    var bookInitialPos = 0
-
-    private var isLoadingBook = false
-    private var isOpenCancelled = false
-    private var loadingView: UIView?
 
     // MARK: -- TTS
 
@@ -65,249 +57,27 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         
         ttsSynthesizer.delegate = self
 
-        // 隐藏导航栏, 保持阅读页面样式 (菜单加载完成后也会设置, 此处提前生效避免加载期露导航栏)
-        fd_prefersNavigationBarHidden = true
-
-        // 阅读页隐藏状态栏 (菜单创建后也会设置, 此处提前生效避免加载期显示时间)
-        UIApplication.shared.setStatusBarHidden(true, with: .none)
-
         if let savedName = UserDefaults.standard.string(forKey: TTS_VOICE_NAME_KEY),
            let savedLang = UserDefaults.standard.string(forKey: TTS_VOICE_LANG_KEY) {
             ttsVoice = AVSpeechSynthesisVoice.speechVoices().first(where: { $0.name == savedName && $0.language == savedLang })
         }
         
+        // 初始化书籍阅读记录
+        updateReadRecord(recordModel: readModel.recordModel)
+        
+        // 初始化菜单
+        readMenu = DZMReadMenu(vc: self, delegate: self)
+        
+        // 背景颜色
         view.backgroundColor = DZMReadConfigure.shared().bgColor
+        
+        // 初始化控制器
+        creatPageController(displayController: GetCurrentReadViewController(isUpdateFont: true))
         
         // 监控阅读长按视图通知
         monitorReadLongPressView()
 
         startAutoSaveTimer()
-
-        if readModel.recordModel != nil {
-            // 已有阅读记录: 直接初始化阅读界面
-            updateReadRecord(recordModel: readModel.recordModel)
-            readMenu = DZMReadMenu(vc: self, delegate: self)
-            creatPageController(displayController: GetCurrentReadViewController(isUpdateFont: true))
-        } else {
-            // 书架直接进入: 先显示加载动画, 内容加载完成后再初始化阅读界面
-            showLoadingView()
-            loadBook()
-        }
-    }
-
-    // MARK: -- 书架直进: 阅读页内加载
-
-    private func showLoadingView() {
-        let lv = UIView(frame: view.bounds)
-        lv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        lv.backgroundColor = view.backgroundColor
-        let indicator = UIActivityIndicatorView(style: .medium)
-        indicator.startAnimating()
-        let label = UILabel()
-        label.text = "正在加载…"
-        label.font = .systemFont(ofSize: 14)
-        label.textColor = .secondaryLabel
-        lv.addSubview(indicator)
-        lv.addSubview(label)
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        label.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            indicator.centerXAnchor.constraint(equalTo: lv.centerXAnchor),
-            indicator.centerYAnchor.constraint(equalTo: lv.centerYAnchor, constant: -12),
-            label.centerXAnchor.constraint(equalTo: lv.centerXAnchor),
-            label.topAnchor.constraint(equalTo: indicator.bottomAnchor, constant: 8),
-        ])
-        view.addSubview(lv)
-        loadingView = lv
-    }
-
-    private func hideLoadingView() {
-        loadingView?.removeFromSuperview()
-        loadingView = nil
-    }
-
-    private func isStillVisible() -> Bool {
-        !isOpenCancelled && navigationController?.viewControllers.contains(self) == true
-    }
-
-    private func loadBook(hasSwitched: Bool = false) {
-        guard !isLoadingBook else { return }
-        isLoadingBook = true
-        let bookUrl = readModel.bookID ?? ""
-        Task {
-            do {
-                let chapters = try await chapterList!(bookUrl)
-                let index = bookInitialIndex
-                let rawContent = try await chapterContent!(bookUrl, index)
-                let content = DZMReadParser.contentTypesetting(content: rawContent)
-                guard !isOpenCancelled else { return }
-                catalogChapters = chapters
-                buildChapterListModels(chapters: chapters, bookUrl: bookUrl)
-                let cm = makeChapterModel(bookUrl: bookUrl, index: index,
-                                          title: bookInitialTitle ?? chapters[safe: index]?.title ?? "开始阅读",
-                                          content: content, chapters: chapters)
-                let rm = DZMReadRecordModel()
-                rm.bookID = bookUrl
-                rm.chapterModel = cm
-                if bookInitialPos > 0 {
-                    rm.modify(chapterID: cm.id, location: bookInitialPos)
-                }
-                await MainActor.run {
-                    self.completeLoad(recordModel: rm, bookUrl: bookUrl, prefetchFrom: index + 1)
-                }
-            } catch {
-                await self.handleLoadFailure(bookUrl: bookUrl, hasSwitched: hasSwitched)
-            }
-        }
-    }
-
-    /// 加载完成(主线程): 组装阅读界面, 并重新绑定目录以定位当前章节
-    private func completeLoad(recordModel: DZMReadRecordModel, bookUrl: String, prefetchFrom: Int?) {
-        guard isStillVisible() else { return }
-        isLoadingBook = false
-        hideLoadingView()
-        readModel.recordModel = recordModel
-        updateReadRecord(recordModel: recordModel)
-        leftView.catalogView.readModel = readModel
-        readMenu = DZMReadMenu(vc: self, delegate: self)
-        creatPageController(displayController: GetCurrentReadViewController(isUpdateFont: true))
-        if let from = prefetchFrom {
-            prefetchNextChapters(bookUrl: bookUrl, from: from)
-        }
-    }
-
-    private func handleLoadFailure(bookUrl: String, hasSwitched: Bool) async {
-        if !hasSwitched, let bk = book, let newBook = try? await NetworkService.shared.autoSwitchSource(for: bk) {
-            var cached = CacheManager.shared.getCachedBookshelf() ?? []
-            if let idx = cached.firstIndex(where: { $0.name == bk.name }) {
-                cached[idx] = newBook
-                CacheManager.shared.cacheBookshelf(cached)
-            }
-            Task { try? await NetworkService.shared.saveBook(newBook) }
-            readModel.bookID = newBook.bookUrl
-            bookInitialIndex = newBook.durChapterIndex ?? bookInitialIndex
-            bookInitialTitle = newBook.durChapterTitle ?? bookInitialTitle
-            bookInitialPos = newBook.durChapterPos ?? bookInitialPos
-            book = newBook
-            isLoadingBook = false
-            await MainActor.run {
-                guard self.isStillVisible() else { return }
-                self.loadBook(hasSwitched: true)
-            }
-            return
-        }
-
-        let index = bookInitialIndex
-        if let chapters = chapterListCache(bookUrl: bookUrl),
-           let rawContent = cachedContent(bookUrl: bookUrl, index: index) {
-            let content = DZMReadParser.contentTypesetting(content: rawContent)
-            catalogChapters = chapters
-            buildChapterListModels(chapters: chapters, bookUrl: bookUrl)
-            let cm = makeChapterModel(bookUrl: bookUrl, index: index,
-                                      title: bookInitialTitle ?? chapters.first?.title ?? "开始阅读",
-                                      content: content, chapters: chapters)
-            let rm = DZMReadRecordModel()
-            rm.bookID = bookUrl
-            rm.chapterModel = cm
-            if bookInitialPos > 0 {
-                rm.modify(chapterID: cm.id, location: bookInitialPos)
-            }
-            await MainActor.run {
-                self.completeLoad(recordModel: rm, bookUrl: bookUrl, prefetchFrom: nil)
-            }
-            return
-        }
-
-        if let cached = cachedContent(bookUrl: bookUrl, index: index) {
-            let cm = makeChapterModel(bookUrl: bookUrl, index: index,
-                                      title: bookInitialTitle ?? "开始阅读",
-                                      content: DZMReadParser.contentTypesetting(content: cached),
-                                      chapters: nil)
-            let rm = DZMReadRecordModel()
-            rm.bookID = bookUrl
-            rm.chapterModel = cm
-            if bookInitialPos > 0 {
-                rm.modify(chapterID: cm.id, location: bookInitialPos)
-            }
-            await MainActor.run {
-                self.completeLoad(recordModel: rm, bookUrl: bookUrl, prefetchFrom: nil)
-            }
-            return
-        }
-
-        await MainActor.run {
-            guard self.isStillVisible() else { return }
-            self.isLoadingBook = false
-            self.hideLoadingView()
-            let msg: String
-            if !NetworkMonitor.shared.isConnected {
-                msg = "当前无网络连接，请联网后重试"
-            } else {
-                msg = "加载失败，请检查网络后重试"
-            }
-            let alert = UIAlertController(title: "加载失败", message: msg, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "确定", style: .default))
-            self.present(alert, animated: true)
-        }
-    }
-
-    private func makeChapterModel(bookUrl: String, index: Int, title: String, content: String, chapters: [Chapter]?) -> DZMReadChapterModel {
-        let cm = DZMReadChapterModel()
-        cm.bookID = bookUrl
-        cm.id = NSNumber(value: index)
-        cm.name = title
-        cm.content = content
-        cm.priority = NSNumber(value: index)
-        if let chapters = chapters {
-            if index > 0 { cm.previousChapterID = NSNumber(value: index - 1) }
-            else { cm.previousChapterID = DZM_READ_NO_MORE_CHAPTER }
-            if index < chapters.count - 1 { cm.nextChapterID = NSNumber(value: index + 1) }
-            else { cm.nextChapterID = DZM_READ_NO_MORE_CHAPTER }
-        } else {
-            cm.previousChapterID = DZM_READ_NO_MORE_CHAPTER
-            cm.nextChapterID = DZM_READ_NO_MORE_CHAPTER
-        }
-        cm.updateFont()
-        return cm
-    }
-
-    private func buildChapterListModels(chapters: [Chapter], bookUrl: String) {
-        readModel.chapterListModels.removeAll()
-        for (i, ch) in chapters.enumerated() {
-            let lm = DZMReadChapterListModel()
-            lm.id = NSNumber(value: i)
-            lm.name = ch.title
-            lm.bookID = bookUrl
-            readModel.chapterListModels.append(lm)
-        }
-    }
-
-    private func chapterListCache(bookUrl: String) -> [Chapter]? {
-        guard CacheManager.shared.cachedCount(bookUrl) > 0 else { return nil }
-        return CacheManager.shared.getCachedChapters(bookUrl: bookUrl)
-    }
-
-    private func cachedContent(bookUrl: String, index: Int) -> String? {
-        if CacheManager.shared.isChapterCached(bookUrl: bookUrl, index: index) {
-            return CacheManager.shared.getCachedChapter(bookUrl: bookUrl, index: index)
-        }
-        return nil
-    }
-
-    private func prefetchNextChapters(bookUrl: String, from index: Int) {
-        guard NetworkMonitor.shared.isConnected else { return }
-        guard let chapters = CacheManager.shared.getCachedChapters(bookUrl: bookUrl) else { return }
-        let end = min(index + 5, chapters.count)
-        guard index < end else { return }
-        Task {
-            for i in index..<end {
-                if CacheManager.shared.isChapterCached(bookUrl: bookUrl, index: i) { continue }
-                guard NetworkMonitor.shared.isConnected else { break }
-                if let c = try? await NetworkService.shared.getBookContent(bookUrl: bookUrl, index: i) {
-                    CacheManager.shared.cacheChapter(bookUrl: bookUrl, index: i, content: c)
-                } else { break }
-            }
-        }
     }
 
     private var autoSaveTimer: Timer?
@@ -329,8 +99,6 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         
         super.viewWillDisappear(animated)
         
-        isOpenCancelled = true
-
         UIApplication.shared.setStatusBarStyle(.default, animated: true)
 
         autoSaveTimer?.invalidate()
