@@ -117,6 +117,7 @@ extension DZMReadController {
     func GetAboveReadRecordModel(recordModel: DZMReadRecordModel!) -> DZMReadRecordModel? {
         guard recordModel.chapterModel != nil else { return nil }
         let record = recordModel.copyModel()
+        crashLog("[flip-A] cur=\(record.chapterModel.id?.intValue ?? -1),\(record.page?.intValue ?? -1)/\(record.chapterModel.pageCount?.intValue ?? -1)")
         let bookID = record.bookID!
         let chapterID = record.chapterModel.previousChapterID
 
@@ -149,6 +150,7 @@ extension DZMReadController {
     func GetBelowReadRecordModel(recordModel: DZMReadRecordModel!) -> DZMReadRecordModel? {
         guard recordModel.chapterModel != nil else { return nil }
         let record = recordModel.copyModel()
+        crashLog("[flip-B] cur=\(record.chapterModel.id?.intValue ?? -1),\(record.page?.intValue ?? -1)/\(record.chapterModel.pageCount?.intValue ?? -1)")
         let bookID = record.bookID!
         let chapterID = record.chapterModel.nextChapterID
 
@@ -197,9 +199,18 @@ extension DZMReadController {
 
     func updateReadRecord(recordModel: DZMReadRecordModel!) {
         if recordModel != nil {
+            let oldIdx = readModel.recordModel.chapterModel?.id?.intValue ?? -1
+            let newIdx = recordModel.chapterModel?.id?.intValue ?? -1
+            let oldPg = readModel.recordModel.page?.intValue ?? -1
+            let newPg = recordModel.page?.intValue ?? -1
+            if newIdx != oldIdx || newPg != oldPg {
+                let stack = Thread.callStackSymbols.dropFirst(2).prefix(4).joined(separator: " <= ")
+                crashLog("[rec-change] old(\(oldIdx),\(oldPg)) new(\(newIdx),\(newPg)) pc=\(recordModel.chapterModel?.pageCount?.intValue ?? -1) loc=\(recordModel.locationFirst?.intValue ?? -1) \(stack)")
+            }
             readModel.recordModel = recordModel
             DZM_READ_RECORD_CURRENT_CHAPTER_LOCATION = recordModel.locationFirst
             saveReadingProgressLocally()
         }
     }
 }
+
