@@ -390,8 +390,6 @@ class ShelfViewController: UIViewController {
                         self.endOpening(bookUrl: openingKey)
                         navigationController?.pushViewController(readController, animated: true)
                     }
-
-                    prefetchNextChapters(book: currentBook, from: index + 1)
                 } catch {
                     if !hasSwitched {
                         if let newBook = try? await NetworkService.shared.autoSwitchSource(for: currentBook) {
@@ -487,22 +485,6 @@ class ShelfViewController: UIViewController {
         }
 
         tryOpen(currentBook: book, hasSwitched: false)
-    }
-
-    private func prefetchNextChapters(book: Book, from index: Int) {
-        guard NetworkMonitor.shared.isConnected else { return }
-        guard let chapters = CacheManager.shared.getCachedChapters(bookUrl: book.bookUrl) else { return }
-        let end = min(index + 5, chapters.count)
-        guard index < end else { return }
-        Task {
-            for i in index..<end {
-                if CacheManager.shared.isChapterCached(bookUrl: book.bookUrl, index: i) { continue }
-                guard NetworkMonitor.shared.isConnected else { break }
-                if let c = try? await NetworkService.shared.getBookContent(bookUrl: book.bookUrl, index: i) {
-                    CacheManager.shared.cacheChapter(bookUrl: book.bookUrl, index: i, content: c)
-                } else { break }
-            }
-        }
     }
 
     private func chapterListCache(bookUrl: String) -> [Chapter]? {
