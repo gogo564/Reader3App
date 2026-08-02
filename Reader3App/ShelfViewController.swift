@@ -321,7 +321,6 @@ class ShelfViewController: UIViewController {
     }
 
     private func openBook(_ book: Book) {
-        crashLog("[openBook] name=\(book.name) idx=\(book.durChapterIndex ?? -1) pos=\(book.durChapterPos ?? -1) time=\(book.durChapterTime ?? -1)")
         let openingKey = book.bookUrl
         let readController = DZMReadController()
         readController.bookAuthor = book.author

@@ -74,8 +74,6 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         // 初始化控制器
         creatPageController(displayController: GetCurrentReadViewController(isUpdateFont: true))
 
-        crashLog("[open] book=\(readModel.bookID ?? "nil") idx=\(readModel.recordModel.chapterModel?.id?.intValue ?? -1) page=\(readModel.recordModel.page?.intValue ?? -1) pc=\(readModel.recordModel.chapterModel?.pageCount?.intValue ?? -1) loc=\(readModel.recordModel.locationFirst?.intValue ?? -1)")
-
         // 监控阅读长按视图通知
         monitorReadLongPressView()
 
@@ -86,7 +84,6 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
 
     private func startAutoSaveTimer() {
         autoSaveTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            crashLog("[timer30]")
             self?.saveReadingProgress()
         }
     }
@@ -107,7 +104,6 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         autoSaveTimer?.invalidate()
         autoSaveTimer = nil
 
-        crashLog("[exit] idx=\(readModel?.recordModel.chapterModel?.id?.intValue ?? -1) page=\(readModel?.recordModel.page?.intValue ?? -1) pc=\(readModel?.recordModel.chapterModel?.pageCount?.intValue ?? -1) loc=\(readModel?.recordModel.locationFirst?.intValue ?? -1)")
         saveReadingProgress()
 
         ttsStopped = true
@@ -130,9 +126,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
         let index = chapterID.intValue
         let pos = rm.locationFirst?.intValue ?? 0
         let key = "\(index):\(pos)"
-        let willSave = key != lastSavedProgressKey
-        crashLog("[save] idx=\(index) pos=\(pos) page=\(rm.page?.intValue ?? -1) pc=\(rm.chapterModel?.pageCount?.intValue ?? -1) loc=\(rm.locationFirst?.intValue ?? -1) key=\(key) willSave=\(willSave)")
-        guard willSave else { return false }
+        guard key != lastSavedProgressKey else { return false }
         lastSavedProgressKey = key
         CacheManager.shared.updateBookProgress(bookUrl: bookUrl, bookName: readModel.bookName ?? "", index: index, chapterTitle: rm.chapterName ?? "", time: Int64(Date().timeIntervalSince1970 * 1000), pos: pos)
         return true

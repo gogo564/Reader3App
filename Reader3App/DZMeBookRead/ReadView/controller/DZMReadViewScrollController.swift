@@ -129,7 +129,6 @@ class DZMReadViewScrollController: DZMViewController, UITableViewDelegate, UITab
             let indexPath: IndexPath = isRollingUp ? ip.last! : ip.first!
             let chapterID = self.chapterIDs[indexPath.section]
             let chapterModel = self.GetChapterModel(chapterID: chapterID)
-            crashLog("[scroll] idx=\(chapterID.intValue) row=\(indexPath.row) isUp=\(isRollingUp)")
             self.vc.readModel.recordModel.modify(chapterModel: chapterModel, page: indexPath.row)
             DZM_READ_RECORD_CURRENT_CHAPTER_LOCATION = self.vc.readModel.recordModel.locationFirst
             DispatchQueue.main.async {
