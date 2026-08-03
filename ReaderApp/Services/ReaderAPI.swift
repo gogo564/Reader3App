@@ -99,17 +99,62 @@ class ReaderAPI {
     }
 
     func searchBooks(keyword: String, page: Int = 1) async throws -> [SearchResult] {
-        let body: [String: Any] = ["keyword": keyword, "page": page]
-        let bodyData = try JSONSerialization.data(withJSONObject: body)
-        let data = try await post("\(apiPrefix)/searchBook", body: bodyData)
-        return try decode(data) as [SearchResult]
+        let concurrentCount = 55
+        let searchSize = 200
+        var results: [SearchResult] = []
+        var seen = Set<String>()
+        var lastIndex = -1
+        var currentPage = 0
+        let maxPages = 5
+
+        while currentPage < maxPages {
+            let body: [String: Any] = [
+                "key": keyword,
+                "bookSourceUrl": "",
+                "bookSourceGroup": "",
+                "concurrentCount": concurrentCount,
+                "searchSize": searchSize,
+                "lastIndex": lastIndex,
+                "page": currentPage
+            ]
+            let bodyData = try JSONSerialization.data(withJSONObject: body)
+            let data = try await post("\(apiPrefix)/searchBookMulti", body: bodyData, timeout: 90)
+
+            do {
+                let response: SearchMultiResponse = try decode(data)
+                let list = response.list
+
+                var added = 0
+                for item in list {
+                    if seen.insert(item.bookUrl).inserted {
+                        results.append(item)
+                        added += 1
+                    }
+                }
+                currentPage += 1
+                if list.isEmpty || added == 0 {
+                    break
+                }
+                let next = response.lastIndex
+                if next < 0 || next <= lastIndex {
+                    break
+                }
+                lastIndex = next
+            } catch let e as APIError {
+                if currentPage > 0, case .apiError(let msg) = e, msg.contains("没有更多了") {
+                    break
+                }
+                throw e
+            }
+        }
+        return results
     }
 
     // MARK: - Book Content
     func getChapterList(bookURL: String, sourceURL: String) async throws -> [Chapter] {
         guard let encodedBook = bookURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let encodedSource = sourceURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "\(baseURL)\(apiPrefix)/getBookContent?url=\(encodedBook)&bookSourceUrl=\(encodedSource)") else {
+              let url = URL(string: "\(baseURL)\(apiPrefix)/getChapterList?url=\(encodedBook)&bookSourceUrl=\(encodedSource)") else {
             throw APIError.invalidURL
         }
         var req = URLRequest(url: url, timeoutInterval: 30)
@@ -173,11 +218,11 @@ class ReaderAPI {
         return data
     }
 
-    private func post(_ path: String, body: Data) async throws -> Data {
+    private func post(_ path: String, body: Data, timeout: TimeInterval = 30) async throws -> Data {
         guard let url = URL(string: "\(baseURL)\(path)") else {
             throw APIError.invalidURL
         }
-        var req = URLRequest(url: url, timeoutInterval: 30)
+        var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
         req.httpBody = body
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")

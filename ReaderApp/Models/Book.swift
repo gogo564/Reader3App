@@ -41,3 +41,8 @@ struct Chapter: Codable, Identifiable {
     let title: String
     let index: Int
 }
+
+struct SearchMultiResponse: Codable {
+    let lastIndex: Int
+    let list: [SearchResult]
+}
