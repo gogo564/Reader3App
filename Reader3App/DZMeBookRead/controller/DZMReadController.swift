@@ -443,7 +443,7 @@ class DZMReadController: DZMViewController,DZMReadMenuDelegate,UIPageViewControl
                 return
             }
 
-            let maxResults = 10
+            let maxResults = 200
             let perTimeout: UInt64 = 8_000_000_000
             let totalTimeout: TimeInterval = 15
             let bookNameLower = bookName.trimmingCharacters(in: .whitespaces).lowercased()
