@@ -121,6 +121,7 @@ final class NetworkService: @unchecked Sendable {
             "key": bookName,
             "bookSourceUrl": sourceUrl,
             "concurrentCount": 1,
+            "searchSize": 200,
             "page": 1,
             "lastIndex": -1
         ] as [String: Any])
