@@ -60,7 +60,7 @@ final class NetworkService: @unchecked Sendable {
 
     // MARK: - Search
     func searchBook(key: String, searchType: String, bookSourceUrl: String = "",
-                    bookSourceGroup: String = "", concurrentCount: Int = 24, searchSize: Int = 200,
+                    bookSourceGroup: String = "", concurrentCount: Int = 24, searchSize: Int = 50,
                     page: Int = 1, lastIndex: Int = -1) async throws -> [SearchResult] {
         let body = try JSONSerialization.data(withJSONObject: [
             "key": key,
@@ -121,7 +121,7 @@ final class NetworkService: @unchecked Sendable {
             "key": bookName,
             "bookSourceUrl": sourceUrl,
             "concurrentCount": 1,
-            "searchSize": 200,
+            "searchSize": 50,
             "page": 1,
             "lastIndex": -1
         ] as [String: Any])
